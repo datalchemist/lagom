@@ -1,33 +1,33 @@
 /*
- * Copyright (C) 2016-2017 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
  */
 package com.lightbend.lagom.internal.persistence.jdbc
 
-import javax.naming.InitialContext
-import javax.sql.DataSource
+import play.api.db.Databases
+import play.api.inject.ApplicationLifecycle
 
-import com.typesafe.config.ConfigFactory
+import scala.concurrent.Future
+import scala.util.Random
 
 object SlickDbTestProvider {
 
-  /** Builds Slick Database (with AsyncExecutor) and bind it as JNDI resource for test purposes  */
-  def buildAndBindSlickDb(dataSource: DataSource) = {
+  private val JNDIName = "DefaultDS"
+  private val JNDIDBName = "DefaultDB"
 
-    val slickDb =
-      SlickDbProvider(
-        dataSource,
-        ConfigFactory.parseString(
-          """
-            |{
-            |  queueSize = 100
-            |  numThreads = 20
-            |  minConnections = 20
-            |  maxConnections = 100
-            |}
-          """.stripMargin
-        )
-      )
-
-    new InitialContext().rebind("DefaultDB", slickDb)
+  private val AsyncExecConfig = new AsyncExecutorConfig {
+    override val numThreads: Int = 20
+    override val minConnections: Int = 20
+    override val maxConnections: Int = 100
+    override val queueSize: Int = 100
   }
+
+  /** Builds Slick Database (with AsyncExecutor) and bind it as JNDI resource for test purposes  */
+  def buildAndBindSlickDb(baseName: String, lifecycle: ApplicationLifecycle): Unit = {
+    val dbName = s"${baseName}_${Random.alphanumeric.take(8).mkString}"
+    val db = Databases.inMemory(dbName, config = Map("jndiName" -> JNDIName))
+    lifecycle.addStopHook(() => Future.successful(db.shutdown()))
+
+    SlickDbProvider.buildAndBindSlickDatabase(db, AsyncExecConfig, JNDIDBName, lifecycle)
+  }
+
 }
