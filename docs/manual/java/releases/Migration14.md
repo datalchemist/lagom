@@ -2,7 +2,7 @@
 
 This guide explains how to migrate from Lagom 1.3 to Lagom 1.4. If you are upgrading from an earlier version, be sure to review previous migration guides.
 
-Lagom 1.4 also updates to the latest major versions of Play (2.6) and Akka (2.5). We have highlighted the changes that are relevant to most Lagom users, but you may need to change code in your services that uses the Play and Akka APIs directly. You'll also need to update any Play services in your Lagom project repositories to be compatible with Play 2.6. Please refer to the [Play 2.6 migration guide](https://www.playframework.com/documentation/2.6.x/Migration26) and the [Akka 2.5 migration guide](https://doc.akka.io/docs/akka/current/project/migration-guide-2.4.x-2.5.x.html?language=java) for more details.
+Lagom 1.4 also updates to the latest major versions of Play (2.6) and Akka (2.5). We have highlighted the changes that are relevant to most Lagom users, but you may need to change code in your services that uses the Play and Akka APIs directly. You'll also need to update any Play services in your Lagom project repositories to be compatible with Play 2.6. Please refer to the [Play 2.6 migration guide](https://www.playframework.com/documentation/2.7.x/Migration26) and the [Akka 2.5 migration guide](https://doc.akka.io/docs/akka/current/project/migration-guide-2.4.x-2.5.x.html?language=java) for more details.
 
 
 ## Build changes
@@ -19,13 +19,13 @@ The version of Lagom can be updated by editing the `project/plugins.sbt` file, a
 addSbtPlugin("com.lightbend.lagom" % "lagom-sbt-plugin" % "1.4.0")
 ```
 
-Lagom 1.4.0 also requires Sbt 0.13.16 or later. If your existing project is using a previous version of Sbt, you will need to upgrade it by editing the `project/build.properties` file. For example:
+Lagom 1.4.0 also requires Sbt 0.13.16 or later (recommended sbt 1.x). If your existing project is using a previous version of Sbt, you will need to upgrade it by editing the `project/build.properties` file. For example:
 
 ```
-sbt.version=0.13.16
+sbt.version=1.1.6
 ```
 
-
+We also recommend you [upgrade](https://www.scala-sbt.org/download.html) your `sbt` launcher.
 
 ## Scala 2.12 support
 
@@ -59,14 +59,14 @@ and use it when declaring dependencies, for example:
 The Scala version can be updated by editing the `build.sbt` file, and updating the `scalaVersion` settings, for example:
 
 ```scala
-scalaVersion in ThisBuild := "2.12.4"
+scalaVersion in ThisBuild := "2.12.10"
 ```
 
 ## Akka HTTP as the default server engine
 
-Play 2.6 introduces a new default server engine implemented using [Akka HTTP](https://doc.akka.io/docs/akka-http/current/scala.html) instead of Netty.
+Play 2.6 introduces a new default server engine implemented using [Akka HTTP](https://doc.akka.io/docs/akka-http/current/?language=java) instead of Netty.
 
-You can read more in the Play documentation at [Akka HTTP Server Backend](https://www.playframework.com/documentation/2.6.x/AkkaHttpServer).
+You can read more in the Play documentation at [Akka HTTP Server Backend](https://www.playframework.com/documentation/2.7.x/AkkaHttpServer).
 
 ### Selecting the server engine in sbt
 
@@ -99,7 +99,7 @@ Maven users will need to explicitly migrate each service to the new Akka HTTP se
 
 ### Configuration API
 
-The class `play.Configuration` was deprecated in favor of using Typesafe Config directly. So, instead of using `play.Configuration` you must now use [`com.typesafe.config.Config`](https://lightbend.github.io/config/latest/api/com/typesafe/config/Config.html). For more details, see the Play documentation: [Java Configuration API Migration](https://www.playframework.com/documentation/2.6.x/JavaConfigMigration26).
+The class `play.Configuration` was deprecated in favor of using Typesafe Config directly. So, instead of using `play.Configuration` you must now use [`com.typesafe.config.Config`](https://lightbend.github.io/config/latest/api/com/typesafe/config/Config.html). For more details, see the Play documentation: [Java Configuration API Migration](https://www.playframework.com/documentation/2.7.x/JavaConfigMigration26).
 
 ### Binding services
 
@@ -233,7 +233,7 @@ Other than that difference, refer to the [Akka Rolling Update](https://doc.akka.
 
 ### Downtime upgrade
 
-If your application can tolerate downtime, we recommend you to enable `ddata` and the new serializer for `akka.Done`.
+If your application can tolerate a *one time only* downtime upgrade, we recommend you to enable `ddata` and the new serializers for `akka.Done`, `akka.actor.Address` and `akka.remote.UniqueAddress`. Once this upgrade is complete, further downtime is not required.
 
 In order to achieve this, make sure you have added the following properties to your `application.conf` file.
 
@@ -241,9 +241,11 @@ In order to achieve this, make sure you have added the following properties to y
 # Enable new sharding state store mode by overriding Lagom's default
 akka.cluster.sharding.state-store-mode = ddata
 
-# Enable the serializer for akka.Done provided in Akka 2.5.8+ to avoid the use of Java serialization.
+# Enable serializers provided in Akka 2.5.8+ to avoid the use of Java serialization.
 akka.actor.serialization-bindings {
-  "akka.Done" = akka-misc
+    "akka.Done"                 = akka-misc
+    "akka.actor.Address"        = akka-misc
+    "akka.remote.UniqueAddress" = akka-misc
 }
 ```
 

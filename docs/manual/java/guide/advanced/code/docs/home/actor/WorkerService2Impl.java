@@ -1,13 +1,21 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.home.actor;
 
-import static akka.pattern.PatternsCS.ask;
+import static akka.pattern.Patterns.ask;
 
 import com.lightbend.lagom.javadsl.api.ServiceCall;
 import com.lightbend.lagom.javadsl.pubsub.PubSubRef;
 import com.lightbend.lagom.javadsl.pubsub.PubSubRegistry;
 import com.lightbend.lagom.javadsl.pubsub.TopicId;
+
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
@@ -23,7 +31,7 @@ import akka.routing.ConsistentHashingGroup;
 import akka.stream.javadsl.Source;
 import akka.util.Timeout;
 
-//#service-impl
+// #service-impl
 public class WorkerService2Impl implements WorkerService2 {
 
   private final ActorRef workerRouter;
@@ -36,17 +44,22 @@ public class WorkerService2Impl implements WorkerService2 {
     // the jobs by their task, i.e. jobs with same task will be
     // delegated to same worker node
     List<String> paths = Arrays.asList("/user/worker");
-    ConsistentHashingGroup groupConf = new ConsistentHashingGroup(paths)
-      .withHashMapper(msg -> {
-        if (msg instanceof Job) {
-          return ((Job) msg).getTask();
-        } else {
-          return null;
-        }
-      });
-      Props routerProps = new ClusterRouterGroup(groupConf,
-        new ClusterRouterGroupSettings(1000, paths,
-          true, "worker-node")).props();
+    ConsistentHashingGroup groupConf =
+        new ConsistentHashingGroup(paths)
+            .withHashMapper(
+                msg -> {
+                  if (msg instanceof Job) {
+                    return ((Job) msg).getTask();
+                  } else {
+                    return null;
+                  }
+                });
+    Set<String> useRoles = new TreeSet<String>();
+    useRoles.add("worker-node");
+    Props routerProps =
+        new ClusterRouterGroup(
+                groupConf, new ClusterRouterGroupSettings(1000, paths, true, useRoles))
+            .props();
     this.workerRouter = system.actorOf(routerProps, "workerRouter");
 
     this.topic = pubSub.refFor(TopicId.of(JobStatus.class, "jobs-status"));
@@ -63,13 +76,14 @@ public class WorkerService2Impl implements WorkerService2 {
   public ServiceCall<Job, JobAccepted> doWork() {
     return job -> {
       // send the job to a worker, via the consistent hashing router
-      CompletionStage<JobAccepted> reply = ask(workerRouter, job, Timeout.apply(
-          5, TimeUnit.SECONDS))
-        .thenApply(ack -> {
-          return (JobAccepted) ack;
-        });
+      CompletionStage<JobAccepted> reply =
+          ask(workerRouter, job, Duration.ofSeconds(5))
+              .thenApply(
+                  ack -> {
+                    return (JobAccepted) ack;
+                  });
       return reply;
     };
   }
 }
-//#service-impl
+// #service-impl

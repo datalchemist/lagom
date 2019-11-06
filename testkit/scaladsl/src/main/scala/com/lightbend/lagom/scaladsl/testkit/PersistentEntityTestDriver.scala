@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.testkit
 
 import scala.collection.immutable
@@ -11,19 +12,21 @@ import scala.util.control.Exception.Catcher
 import scala.util.control.NonFatal
 
 import akka.actor.ActorSystem
+import akka.actor.ExtendedActorSystem
 import akka.serialization.JavaSerializer
+import akka.serialization.Serialization
 import akka.serialization.SerializationExtension
-import akka.serialization.SerializerWithStringManifest
+import akka.serialization.Serializers
 import com.lightbend.lagom.scaladsl.persistence.PersistentEntity
 import com.lightbend.lagom.scaladsl.persistence.PersistentEntity.ReplyType
 
 object PersistentEntityTestDriver {
   final case class Outcome[E, S](
-    events: immutable.Seq[E], state: S,
-    sideEffects: immutable.Seq[SideEffect],
-    issues:      immutable.Seq[Issue]
+      events: immutable.Seq[E],
+      state: S,
+      sideEffects: immutable.Seq[SideEffect],
+      issues: immutable.Seq[Issue]
   ) {
-
     /**
      * The messages that were sent as replies using the context that is
      * passed as parameter to the command handler functions.
@@ -58,7 +61,6 @@ object PersistentEntityTestDriver {
   final case class UnhandledEvent(event: Any) extends Issue {
     override def toString: String = s"No event handler registered for ${event.getClass}"
   }
-
 }
 
 /**
@@ -69,22 +71,22 @@ object PersistentEntityTestDriver {
  * serializable, and reports any such problems in the `issues` of the `Outcome`.
  */
 class PersistentEntityTestDriver[C, E, S](
-  val system:   ActorSystem,
-  val entity:   PersistentEntity { type Command = C; type Event = E; type State = S },
-  val entityId: String
+    val system: ActorSystem,
+    val entity: PersistentEntity { type Command = C; type Event = E; type State = S },
+    val entityId: String
 ) {
   import PersistentEntityTestDriver._
 
   private val serialization = SerializationExtension(system)
 
   entity.internalSetEntityId(entityId)
-  private var state: S = entity.initialState
+  private var state: S                  = entity.initialState
   private val behavior: entity.Behavior = entity.behavior
 
-  private var initialized = false
+  private var initialized                     = false
   private var sideEffects: Vector[SideEffect] = Vector.empty
-  private var issues: Vector[Issue] = Vector.empty
-  private var allIssues: Vector[Issue] = Vector.empty
+  private var issues: Vector[Issue]           = Vector.empty
+  private var allIssues: Vector[Issue]        = Vector.empty
 
   /**
    * Initialize the entity.
@@ -126,9 +128,11 @@ class PersistentEntityTestDriver[C, E, S](
   }
 
   private val unhandledState: Catcher[Nothing] = {
-    case e: MatchError ⇒ throw new IllegalStateException(
-      s"Undefined state [${state.getClass.getName}] in [${entity.getClass.getName}] with id [${entityId}]"
-    )
+    case e: MatchError =>
+      throw new IllegalStateException(
+        s"Undefined state [${state.getClass.getName}] in [${entity.getClass.getName}] with id [${entityId}]",
+        e
+      )
   }
 
   private def unhandledCommand: PartialFunction[(C, entity.CommandContext[Any], S), entity.Persist] = {
@@ -172,7 +176,8 @@ class PersistentEntityTestDriver[C, E, S](
 
         issues ++= checkSerialization(cmd)
 
-        val actions = try behavior(state) catch unhandledState
+        val actions = try behavior(state)
+        catch unhandledState
         val commandHandler = actions.commandHandlers.get(cmd.getClass) match {
           case Some(h) => h
           case None    => PartialFunction.empty
@@ -236,44 +241,47 @@ class PersistentEntityTestDriver[C, E, S](
   }
 
   private def applyEvent(event: E): Unit = {
-    val actions = try behavior(state) catch unhandledState
+    val actions = try behavior(state)
+    catch unhandledState
     state = actions.eventHandler.applyOrElse((event, state), unhandledEvent)
   }
 
   private def checkSerialization(obj: Any): Option[Issue] = {
-    val obj1 = obj.asInstanceOf[AnyRef]
-    // check that it is configured
-    Try(serialization.findSerializerFor(obj1)) match {
-      case Failure(e) => Some(NoSerializer(obj, e))
-      case Success(serializer) =>
-        // verify serialization-deserialization round trip
-        Try(serializer.toBinary(obj1)) match {
-          case Failure(e) => Some(NotSerializable(obj, e))
-          case Success(blob) =>
-            val manifest = serializer match {
-              case ser: SerializerWithStringManifest => ser.manifest(obj1)
-              case _                                 => if (serializer.includeManifest) obj.getClass.getName else ""
-            }
-            serialization.deserialize(blob, serializer.identifier, manifest) match {
-              case Failure(e) => Some(NotDeserializable(obj, e))
-              case Success(obj2) =>
-                if (obj != obj2) {
-                  Some(NotEqualAfterSerialization(
-                    s"Object [$obj] does not equal [$obj2] after serialization/deserialization", obj1, obj2
-                  ))
-                } else if (serializer.isInstanceOf[JavaSerializer] && !isOkForJavaSerialization(obj1.getClass))
-                  Some(UsingJavaSerializer(obj1))
-                else
-                  None
-            }
-        }
+    Serialization.withTransportInformation(system.asInstanceOf[ExtendedActorSystem]) { () =>
+      val obj1 = obj.asInstanceOf[AnyRef]
+      // check that it is configured
+      Try(serialization.findSerializerFor(obj1)) match {
+        case Failure(e)          => Some(NoSerializer(obj, e))
+        case Success(serializer) =>
+          // verify serialization-deserialization round trip
+          Try(serializer.toBinary(obj1)) match {
+            case Failure(e) => Some(NotSerializable(obj, e))
+            case Success(blob) =>
+              val manifest = Serializers.manifestFor(serializer, obj1)
+              serialization.deserialize(blob, serializer.identifier, manifest) match {
+                case Failure(e) => Some(NotDeserializable(obj, e))
+                case Success(obj2) =>
+                  if (obj != obj2) {
+                    Some(
+                      NotEqualAfterSerialization(
+                        s"Object [$obj] does not equal [$obj2] after serialization/deserialization",
+                        obj1,
+                        obj2
+                      )
+                    )
+                  } else if (serializer.isInstanceOf[JavaSerializer] && !isOkForJavaSerialization(obj1.getClass))
+                    Some(UsingJavaSerializer(obj1))
+                  else
+                    None
+              }
+          }
+      }
     }
   }
 
   private def isOkForJavaSerialization(clazz: Class[_]): Boolean = {
     // e.g. String
     clazz.getName.startsWith("java.lang.") ||
-      clazz.getName.startsWith("akka.")
+    clazz.getName.startsWith("akka.")
   }
-
 }

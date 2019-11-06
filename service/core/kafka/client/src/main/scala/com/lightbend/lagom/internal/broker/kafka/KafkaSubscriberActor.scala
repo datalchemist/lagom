@@ -1,30 +1,50 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.broker.kafka
 
 import java.net.URI
 
 import akka.Done
-import akka.actor.{ Actor, ActorLogging, Props, Status }
-import akka.kafka.ConsumerMessage.{ CommittableOffset, CommittableOffsetBatch }
+import akka.actor.Actor
+import akka.actor.ActorLogging
+import akka.actor.Props
+import akka.actor.Status
+import akka.kafka.ConsumerMessage.CommittableOffset
+import akka.kafka.scaladsl.Committer
 import akka.kafka.scaladsl.{ Consumer => ReactiveConsumer }
-import akka.kafka.{ AutoSubscription, ConsumerSettings }
+import akka.kafka.AutoSubscription
+import akka.kafka.ConsumerSettings
 import akka.pattern.pipe
-import akka.stream.scaladsl.{ Flow, GraphDSL, Keep, Sink, Source, Unzip, Zip }
+import akka.stream.scaladsl.Flow
+import akka.stream.scaladsl.GraphDSL
+import akka.stream.scaladsl.Keep
+import akka.stream.scaladsl.Sink
+import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.Unzip
+import akka.stream.scaladsl.Zip
 import akka.stream._
 import com.lightbend.lagom.internal.api.UriUtils
 import org.apache.kafka.clients.consumer.ConsumerRecord
 
-import scala.concurrent.{ ExecutionContext, Future, Promise }
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+import scala.concurrent.Promise
 
 private[lagom] class KafkaSubscriberActor[Payload, SubscriberPayload](
-  kafkaConfig: KafkaConfig, consumerConfig: ConsumerConfig,
-  locateService: String => Future[Seq[URI]], topicId: String, flow: Flow[SubscriberPayload, Done, _],
-  consumerSettings: ConsumerSettings[String, Payload], subscription: AutoSubscription,
-  streamCompleted: Promise[Done], transform: ConsumerRecord[String, Payload] => SubscriberPayload
-)(implicit mat: Materializer, ec: ExecutionContext) extends Actor with ActorLogging {
-
+    kafkaConfig: KafkaConfig,
+    consumerConfig: ConsumerConfig,
+    locateService: String => Future[Seq[URI]],
+    topicId: String,
+    flow: Flow[SubscriberPayload, Done, _],
+    consumerSettings: ConsumerSettings[String, Payload],
+    subscription: AutoSubscription,
+    streamCompleted: Promise[Done],
+    transform: ConsumerRecord[String, Payload] => SubscriberPayload
+)(implicit mat: Materializer, ec: ExecutionContext)
+    extends Actor
+    with ActorLogging {
   /** Switch used to terminate the on-going Kafka publishing stream when this actor fails.*/
   private var shutdown: Option[KillSwitch] = None
 
@@ -32,10 +52,12 @@ private[lagom] class KafkaSubscriberActor[Payload, SubscriberPayload](
     kafkaConfig.serviceName match {
       case Some(name) =>
         log.debug("Looking up Kafka service from service locator with name [{}] for at least once source", name)
-        locateService(name).map {
-          case Nil  => None
-          case uris => Some(UriUtils.hostAndPorts(uris))
-        } pipeTo self
+        locateService(name)
+          .map {
+            case Nil  => None
+            case uris => Some(UriUtils.hostAndPorts(uris))
+          }
+          .pipeTo(self)
         context.become(locatingService(name))
       case None =>
         run(None)
@@ -81,12 +103,12 @@ private[lagom] class KafkaSubscriberActor[Payload, SubscriberPayload](
         .run()
 
     shutdown = Some(killSwitch)
-    streamDone pipeTo self
+    streamDone.pipeTo(self)
     context.become(running)
   }
 
   private def atLeastOnce(serviceLocatorUris: Option[String]): Source[Done, _] = {
-    // Creating a Source of pair where the first element is a reactive-kafka committable offset,
+    // Creating a Source of pair where the first element is a Alpakka Kafka committable offset,
     // and the second it's the actual message. Then, the source of pair is splitted into
     // two streams, so that the `flow` passed in argument can be applied to the underlying message.
     // After having applied the `flow`, the two streams are combined back and the processed message's
@@ -95,19 +117,18 @@ private[lagom] class KafkaSubscriberActor[Payload, SubscriberPayload](
       case Some(uris) => consumerSettings.withBootstrapServers(uris)
       case None       => consumerSettings
     }
-    val pairedCommittableSource = ReactiveConsumer.committableSource(consumerSettingsWithUri, subscription)
+    val pairedCommittableSource = ReactiveConsumer
+      .committableSource(consumerSettingsWithUri, subscription)
       .map(committableMessage => (committableMessage.committableOffset, transform(committableMessage.record)))
 
     val committOffsetFlow = Flow.fromGraph(GraphDSL.create(flow) { implicit builder => flow =>
       import GraphDSL.Implicits._
       val unzip = builder.add(Unzip[CommittableOffset, SubscriberPayload])
-      val zip = builder.add(Zip[CommittableOffset, Done])
+      val zip   = builder.add(Zip[CommittableOffset, Done])
       val committer = {
         val commitFlow = Flow[(CommittableOffset, Done)]
-          .groupedWithin(consumerConfig.batchingSize, consumerConfig.batchingInterval)
-          .map(group => group.foldLeft(CommittableOffsetBatch.empty) { (batch, elem) => batch.updated(elem._1) })
-          // parallelism set to 3 for no good reason other than because the akka team has seen good throughput with this value
-          .mapAsync(parallelism = 3)(_.commitScaladsl())
+          .map(_._1)
+          .via(Committer.flow(consumerConfig.committerSettings))
         builder.add(commitFlow)
       }
       // To allow the user flow to do its own batching, the offset side of the flow needs to effectively buffer
@@ -127,15 +148,15 @@ private[lagom] class KafkaSubscriberActor[Payload, SubscriberPayload](
 
 object KafkaSubscriberActor {
   def props[Payload, SubscriberPayload](
-    kafkaConfig:      KafkaConfig,
-    consumerConfig:   ConsumerConfig,
-    locateService:    String => Future[Seq[URI]],
-    topicId:          String,
-    flow:             Flow[SubscriberPayload, Done, _],
-    consumerSettings: ConsumerSettings[String, Payload],
-    subscription:     AutoSubscription,
-    streamCompleted:  Promise[Done],
-    transform:        ConsumerRecord[String, Payload] => SubscriberPayload
+      kafkaConfig: KafkaConfig,
+      consumerConfig: ConsumerConfig,
+      locateService: String => Future[Seq[URI]],
+      topicId: String,
+      flow: Flow[SubscriberPayload, Done, _],
+      consumerSettings: ConsumerSettings[String, Payload],
+      subscription: AutoSubscription,
+      streamCompleted: Promise[Done],
+      transform: ConsumerRecord[String, Payload] => SubscriberPayload
   )(implicit mat: Materializer, ec: ExecutionContext) =
     Props(
       new KafkaSubscriberActor[Payload, SubscriberPayload](

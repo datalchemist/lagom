@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.javadsl.pubsub
 
 import akka.actor.ActorSystem
@@ -9,19 +10,19 @@ import com.typesafe.config.Config
 import javax.inject.Inject
 import javax.inject.Singleton
 
-import com.lightbend.lagom.javadsl.pubsub.{ PubSubRef, PubSubRegistry, TopicId }
+import com.lightbend.lagom.javadsl.pubsub.PubSubRef
+import com.lightbend.lagom.javadsl.pubsub.PubSubRegistry
+import com.lightbend.lagom.javadsl.pubsub.TopicId
 
 @Singleton
 private[lagom] class PubSubRegistryImpl(system: ActorSystem, conf: Config) extends PubSubRegistry {
-
   @Inject
   def this(system: ActorSystem) =
     this(system, system.settings.config.getConfig("lagom.pubsub"))
 
-  private val pubsub = DistributedPubSub(system)
+  private val pubsub          = DistributedPubSub(system)
   private val bufferSize: Int = conf.getInt("subscriber-buffer-size")
 
   override def refFor[T](topic: TopicId[T]): PubSubRef[T] =
     new PubSubRef(topic, pubsub.mediator, system, bufferSize)
-
 }

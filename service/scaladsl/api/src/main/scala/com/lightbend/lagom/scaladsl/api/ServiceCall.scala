@@ -1,11 +1,13 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.api
 
 import akka.NotUsed
 import com.lightbend.lagom.internal.api.Execution
-import com.lightbend.lagom.scaladsl.api.transport.{ RequestHeader, ResponseHeader }
+import com.lightbend.lagom.scaladsl.api.transport.RequestHeader
+import com.lightbend.lagom.scaladsl.api.transport.ResponseHeader
 
 import scala.concurrent.Future
 
@@ -33,8 +35,7 @@ trait ServiceCall[Request, Response] {
    *
    * @return A future of the response entity.
    */
-  def invoke()(implicit evidence: Request =:= NotUsed): Future[Response] =
-    this.asInstanceOf[ServiceCall[NotUsed, Response]].invoke(NotUsed)
+  def invoke()(implicit evidence: NotUsed =:= Request): Future[Response] = invoke(NotUsed)
 
   /**
    * Make any modifications necessary to the request header.

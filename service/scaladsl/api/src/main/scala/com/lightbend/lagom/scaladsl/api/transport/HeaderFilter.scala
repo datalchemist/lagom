@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.api.transport
 
 import com.lightbend.lagom.scaladsl.api.security.ServicePrincipal
@@ -65,8 +66,8 @@ object HeaderFilter {
    * A noop header transformer, used to deconfigure specific transformers.
    */
   val NoHeaderFilter: HeaderFilter = new HeaderFilter() {
-    override def transformClientRequest(request: RequestHeader): RequestHeader = request
-    override def transformServerRequest(request: RequestHeader): RequestHeader = request
+    override def transformClientRequest(request: RequestHeader): RequestHeader                             = request
+    override def transformServerRequest(request: RequestHeader): RequestHeader                             = request
     override def transformServerResponse(response: ResponseHeader, request: RequestHeader): ResponseHeader = response
     override def transformClientResponse(response: ResponseHeader, request: RequestHeader): ResponseHeader = response
   }
@@ -80,7 +81,7 @@ object HeaderFilter {
    * @param filters The filters to create the composite filter from.
    * @return The composite filter.
    */
-  def composite(filters: HeaderFilter*): HeaderFilter = new Composite(filters.to[immutable.Seq])
+  def composite(filters: HeaderFilter*): HeaderFilter = new Composite(filters.toIndexedSeq)
 
   /**
    * A composite header filter.
@@ -110,7 +111,6 @@ object HeaderFilter {
       filters.foldRight(response)((filter, resp) => filter.transformClientResponse(response, request))
     }
   }
-
 }
 
 /**
@@ -139,13 +139,13 @@ object UserAgentHeaderFilter extends HeaderFilter {
   }
 
   override def transformServerResponse(
-    response: ResponseHeader,
-    request:  RequestHeader
+      response: ResponseHeader,
+      request: RequestHeader
   ): ResponseHeader = response
 
   override def transformClientResponse(
-    response: ResponseHeader,
-    request:  RequestHeader
+      response: ResponseHeader,
+      request: RequestHeader
   ): ResponseHeader = response
 }
 //#user-agent-header-filter

@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.javadsl.pubsub
 
 import java.io.NotSerializableException
@@ -46,15 +47,14 @@ import akka.NotUsed
  * of the messages. When the buffer is full the oldest messages are dropped to make
  * room for new messages.
  */
-final class PubSubRef[T](val topic: TopicId[T], mediator: ActorRef, system: ActorSystem,
-                         bufferSize: Int)
-  extends NoSerializationVerificationNeeded {
+final class PubSubRef[T](val topic: TopicId[T], mediator: ActorRef, system: ActorSystem, bufferSize: Int)
+    extends NoSerializationVerificationNeeded {
   import akka.cluster.pubsub.DistributedPubSubMediator._
 
   private val hasAnySubscribersTimeout = Timeout(5.seconds)
 
-  private val publishFun: Any => Unit = {
-    message => mediator ! Publish(topic.name, message)
+  private val publishFun: Any => Unit = { message =>
+    mediator ! Publish(topic.name, message)
   }
 
   /*
@@ -70,8 +70,11 @@ final class PubSubRef[T](val topic: TopicId[T], mediator: ActorRef, system: Acto
    * this `Sink` and then `run` the stream.
    */
   def publisher(): Sink[T, NotUsed] = {
-    scaladsl.Sink.foreach[T](publishFun)
-      .mapMaterializedValue(_ => NotUsed).asJava
+    val res: scaladsl.Sink[T, NotUsed] =
+      scaladsl.Sink
+        .foreach[T](publishFun)
+        .mapMaterializedValue(_ => NotUsed)
+    res.asJava
   }
 
   /**
@@ -82,11 +85,14 @@ final class PubSubRef[T](val topic: TopicId[T], mediator: ActorRef, system: Acto
    * this `Source` and then `run` the stream.
    */
   def subscriber(): Source[T, NotUsed] = {
-    scaladsl.Source.actorRef[T](bufferSize, OverflowStrategy.dropHead)
-      .mapMaterializedValue { ref =>
-        mediator ! Subscribe(topic.name, ref)
-        NotUsed
-      }.asJava
+    val res: scaladsl.Source[T, NotUsed] =
+      scaladsl.Source
+        .actorRef[T](bufferSize, OverflowStrategy.dropHead)
+        .mapMaterializedValue { ref =>
+          mediator ! Subscribe(topic.name, ref)
+          NotUsed
+        }
+    res.asJava
   }
 
   /**
@@ -105,9 +111,11 @@ final class PubSubRef[T](val topic: TopicId[T], mediator: ActorRef, system: Acto
     import scala.compat.java8.FutureConverters._
     import system.dispatcher
     implicit val timeout = hasAnySubscribersTimeout
-    val result = (mediator ? GetTopics).map {
-      case CurrentTopics(topics) => topics.contains(topic.name)
-    }.mapTo[java.lang.Boolean]
+    val result = (mediator ? GetTopics)
+      .map {
+        case CurrentTopics(topics) => topics.contains(topic.name)
+      }
+      .mapTo[java.lang.Boolean]
     result.toJava
   }
 
@@ -116,5 +124,4 @@ final class PubSubRef[T](val topic: TopicId[T], mediator: ActorRef, system: Acto
     throw new NotSerializableException(s"${getClass.getName} is not serializable. Send the entityId instead.")
 
   override def toString: String = s"PubSubRef($topic)"
-
 }

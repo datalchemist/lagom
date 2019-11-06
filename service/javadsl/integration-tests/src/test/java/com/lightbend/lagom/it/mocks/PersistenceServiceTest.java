@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.it.mocks;
 
 import static org.junit.Assert.assertEquals;
@@ -21,10 +22,11 @@ public class PersistenceServiceTest {
 
   @BeforeClass
   public static void setUp() {
-    server = startServer(defaultSetup()
-                    .withCassandra()
-                    .configureBuilder(b -> b.bindings(new PersistenceServiceModule()))
-    );
+    server =
+        startServer(
+            defaultSetup()
+                .withCassandra()
+                .configureBuilder(b -> b.bindings(new PersistenceServiceModule())));
     client = server.client(PersistenceService.class);
   }
 
@@ -44,9 +46,7 @@ public class PersistenceServiceTest {
 
   @Test
   public void shouldHaveAWorkingCassandraSession() throws Exception {
-    assertEquals("ok", client.checkCassandraSession().invoke().toCompletableFuture().get(20, SECONDS));
+    assertEquals(
+        "ok", client.checkCassandraSession().invoke().toCompletableFuture().get(20, SECONDS));
   }
-
-
-
 }

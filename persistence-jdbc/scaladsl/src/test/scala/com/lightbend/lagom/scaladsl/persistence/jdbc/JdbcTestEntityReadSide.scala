@@ -1,22 +1,26 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.persistence.jdbc
 
 import java.sql.Connection
 import com.lightbend.lagom.scaladsl.persistence.ReadSideProcessor.ReadSideHandler
 import com.lightbend.lagom.scaladsl.persistence.TestEntity.Evt
-import com.lightbend.lagom.scaladsl.persistence.{ AggregateEventTag, EventStreamElement, ReadSideProcessor, TestEntity }
+import com.lightbend.lagom.scaladsl.persistence.AggregateEventTag
+import com.lightbend.lagom.scaladsl.persistence.EventStreamElement
+import com.lightbend.lagom.scaladsl.persistence.ReadSideProcessor
+import com.lightbend.lagom.scaladsl.persistence.TestEntity
 
 import scala.concurrent.Future
 
 object JdbcTestEntityReadSide {
-
   class TestEntityReadSideProcessor(readSide: JdbcReadSide) extends ReadSideProcessor[TestEntity.Evt] {
     import JdbcSession.tryWith
 
     def buildHandler(): ReadSideHandler[TestEntity.Evt] =
-      readSide.builder[TestEntity.Evt]("test-entity-read-side")
+      readSide
+        .builder[TestEntity.Evt]("test-entity-read-side")
         .setGlobalPrepare(this.createTable)
         .setEventHandler(updateCount _)
         .build()
@@ -33,7 +37,7 @@ object JdbcTestEntityReadSide {
         tryWith(statement.executeQuery) { rs =>
           tryWith(if (rs.next) {
             val count: Long = rs.getLong("count")
-            val update = connection.prepareStatement("update testcounts set count = ? where id = ?")
+            val update      = connection.prepareStatement("update testcounts set count = ? where id = ?")
             update.setLong(1, count + 1)
             update.setString(2, event.entityId)
             update
@@ -48,22 +52,20 @@ object JdbcTestEntityReadSide {
 
     def aggregateTags: Set[AggregateEventTag[Evt]] = TestEntity.Evt.aggregateEventShards.allTags
   }
-
 }
 
 class JdbcTestEntityReadSide(session: JdbcSession) {
-
   import JdbcSession.tryWith
 
-  def getAppendCount(id: String): Future[Long] = session.withConnection(connection => {
-    tryWith(connection.prepareStatement("select count from testcounts where id = ?")) { statement =>
-      statement.setString(1, id)
+  def getAppendCount(id: String): Future[Long] =
+    session.withConnection(connection => {
+      tryWith(connection.prepareStatement("select count from testcounts where id = ?")) { statement =>
+        statement.setString(1, id)
 
-      tryWith(statement.executeQuery()) { rs =>
-        if (rs.next()) rs.getLong("count")
-        else 0L
+        tryWith(statement.executeQuery()) { rs =>
+          if (rs.next()) rs.getLong("count")
+          else 0L
+        }
       }
-    }
-  })
-
+    })
 }

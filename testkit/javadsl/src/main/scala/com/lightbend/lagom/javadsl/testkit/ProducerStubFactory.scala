@@ -1,17 +1,22 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.javadsl.testkit
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.function.{ Function => JFunction }
-import javax.inject.{ Inject, Singleton }
+import javax.inject.Inject
+import javax.inject.Singleton
 
-import akka.actor.{ ActorRef, ActorSystem, Props }
+import akka.actor.ActorRef
+import akka.actor.ActorSystem
+import akka.actor.Props
 import akka.stream.Materializer
 import com.lightbend.lagom.internal.javadsl.testkit.TopicStub
 import com.lightbend.lagom.internal.testkit.TopicBufferActor
-import com.lightbend.lagom.javadsl.api.broker.{ Message, Topic }
+import com.lightbend.lagom.javadsl.api.broker.Message
+import com.lightbend.lagom.javadsl.api.broker.Topic
 
 /**
  * Factors [[com.lightbend.lagom.javadsl.testkit.ProducerStub]]'s. This is a singleton that should be [[javax.inject.Inject]]ed
@@ -19,7 +24,6 @@ import com.lightbend.lagom.javadsl.api.broker.{ Message, Topic }
  */
 @Singleton
 final class ProducerStubFactory @Inject() (actorSystem: ActorSystem, materializer: Materializer) {
-
   private val topics = new ConcurrentHashMap[String, ProducerStub[_]]
 
   def producer[T](topicId: String): ProducerStub[T] = {

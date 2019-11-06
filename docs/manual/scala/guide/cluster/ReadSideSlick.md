@@ -1,6 +1,6 @@
 # Slick Read-Side support
 
-This page is specifically about Lagom's support for relational database read-sides using JDBC.  Before reading this, you should familiarize yourself with Lagom's general [[read-side support|ReadSide]] and [[relational database read-side support overview|ReadSideRDBMS]].
+This page is specifically about Lagom's support for relational database read-sides using Slick.  Before reading this, you should familiarize yourself with Lagom's general [[read-side support|ReadSide]] and [[relational database read-side support overview|ReadSideRDBMS]].
 
 
 ## Configuration
@@ -62,7 +62,7 @@ The global prepare callback is run from an Akka cluster singleton.  It may be ru
 
 Of course, setting a global prepare callback is completely optional, you may prefer to manage database tables manually, but it is very convenient for development and test environments to use this callback to create them for you.
 
-Below is an example method that we've implemented to create tables using Slick DDL generation. Note that at in its current state, Slick doesn't generate create table statements with "IF NOT EXISTS" clause. Therefore, we must do it programatically.
+Below is an example method that we've implemented to create tables using Slick DDL generation. Here Slick support for DDL statements is used to create the table only if it does not exists, so that the operation can be idempotent as explained before.
 
 @[slick-mapping-schema](code/docs/home/scaladsl/persistence/SlickRepos.scala)
 
@@ -86,6 +86,10 @@ Once you've created your read-side processor, you need to register it with Lagom
 
 @[register-event-processor](code/docs/home/scaladsl/persistence/BlogServiceImpl3.scala)
 
+Note that if you are utilizing [[Macwire for dependency injection|DependencyInjection#Wiring-together-a-Lagom-application]], you can simply add the following to your Application Loader:
+
+@[register-event-processor](code/docs/home/scaladsl/persistence/SlickBlogApplicationLoader.scala)
+
 ### Event handlers
 
 The event handlers take an event and returns a Slick `DBIOAction`.
@@ -102,3 +106,9 @@ This can then be registered with the builder using `setEventHandler`:
 Once you have finished registering all your event handlers, you can invoke the `build` method and return the built handler:
 
 @[build](code/docs/home/scaladsl/persistence/SlickBlogEventProcessor.scala)
+
+## Application Loader
+
+The Lagom Application loader needs to to be configured for Slick persistence. This can be done by mixing in the `SlickPersistentComponents` class like so:
+
+@[load-components](code/docs/home/scaladsl/persistence/SlickBlogApplicationLoader.scala)

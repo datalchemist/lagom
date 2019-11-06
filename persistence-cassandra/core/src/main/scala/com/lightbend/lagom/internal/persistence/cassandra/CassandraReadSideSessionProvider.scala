@@ -1,25 +1,31 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.persistence.cassandra
 
 import akka.Done
-import akka.actor.{ ActorSystem, ExtendedActorSystem }
+import akka.actor.ActorSystem
+import akka.actor.ExtendedActorSystem
 import akka.event.Logging
 import akka.persistence.cassandra.session.CassandraSessionSettings
 import akka.persistence.cassandra.session.scaladsl.{ CassandraSession => AkkaScaladslCassandraSession }
-import akka.persistence.cassandra.{ CassandraPluginConfig, SessionProvider }
+import akka.persistence.cassandra.CassandraPluginConfig
+import akka.persistence.cassandra.SessionProvider
 import com.datastax.driver.core.Session
 
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 
 /**
  * Internal API
  */
 private[lagom] object CassandraReadSideSessionProvider {
-
-  def apply(system: ActorSystem, settings: CassandraSessionSettings, executionContext: ExecutionContext): AkkaScaladslCassandraSession = {
-
+  def apply(
+      system: ActorSystem,
+      settings: CassandraSessionSettings,
+      executionContext: ExecutionContext
+  ): AkkaScaladslCassandraSession = {
     import akka.persistence.cassandra.ListenableFutureConverter
     import akka.util.Helpers.Requiring
 
@@ -29,14 +35,16 @@ private[lagom] object CassandraReadSideSessionProvider {
     val replicationStrategy: String = CassandraPluginConfig.getReplicationStrategy(
       cfg.getString("replication-strategy"),
       cfg.getInt("replication-factor"),
-      cfg.getStringList("data-center-replication-factors").asScala
+      cfg.getStringList("data-center-replication-factors").asScala.toSeq
     )
 
     val keyspaceAutoCreate: Boolean = cfg.getBoolean("keyspace-autocreate")
-    val keyspace: String = cfg.getString("keyspace").requiring(
-      !keyspaceAutoCreate || _ > "",
-      "'keyspace' configuration must be defined, or use keyspace-autocreate=off"
-    )
+    val keyspace: String = cfg
+      .getString("keyspace")
+      .requiring(
+        !keyspaceAutoCreate || _ > "",
+        "'keyspace' configuration must be defined, or use keyspace-autocreate=off"
+      )
 
     def init(session: Session): Future[Done] = {
       implicit val ec = executionContext
@@ -46,9 +54,11 @@ private[lagom] object CassandraReadSideSessionProvider {
             CREATE KEYSPACE IF NOT EXISTS $keyspace
             WITH REPLICATION = { 'class' : $replicationStrategy }
             """).asScala
-        result1.flatMap { _ =>
-          session.executeAsync(s"USE $keyspace;").asScala
-        }.map(_ => Done)
+        result1
+          .flatMap { _ =>
+            session.executeAsync(s"USE $keyspace;").asScala
+          }
+          .map(_ => Done)
       } else if (keyspace != "")
         session.executeAsync(s"USE $keyspace;").asScala.map(_ => Done)
       else

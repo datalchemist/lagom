@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.scaladsl.services
 
 package helloservice {
@@ -14,7 +18,6 @@ package helloservice {
 }
 
 package lagomapplication {
-
   import helloservice._
 
   //#lagom-application
@@ -23,16 +26,14 @@ package lagomapplication {
   import com.softwaremill.macwire._
 
   abstract class HelloApplication(context: LagomApplicationContext)
-    extends LagomApplication(context)
+      extends LagomApplication(context)
       with AhcWSComponents {
-
     override lazy val lagomServer = serverFor[HelloService](wire[HelloServiceImpl])
   }
   //#lagom-application
 }
 
 package lagomloader {
-
   import lagomapplication._
   import helloservice._
 
@@ -42,7 +43,6 @@ package lagomloader {
   import com.lightbend.lagom.scaladsl.devmode.LagomDevModeComponents
 
   class HelloApplicationLoader extends LagomApplicationLoader {
-
     override def loadDevMode(context: LagomApplicationContext) =
       new HelloApplication(context) with LagomDevModeComponents
 
@@ -57,7 +57,6 @@ package lagomloader {
 }
 
 package callstream {
-
   import akka.NotUsed
   import com.lightbend.lagom.scaladsl.api.ServiceCall
 
@@ -69,16 +68,21 @@ package callstream {
     import akka.stream.scaladsl.Source
 
     override def tick(intervalMs: Int) = ServiceCall { tickMessage =>
-      Future.successful(Source.tick(
-        intervalMs.milliseconds, intervalMs.milliseconds, tickMessage
-      ).mapMaterializedValue(_ => NotUsed))
+      Future.successful(
+        Source
+          .tick(
+            intervalMs.milliseconds,
+            intervalMs.milliseconds,
+            tickMessage
+          )
+          .mapMaterializedValue(_ => NotUsed)
+      )
     }
     //#tick-service-call
   }
 }
 
 package hellostream {
-
   import com.lightbend.lagom.scaladsl.api.ServiceCall
   import scala.concurrent.Future
 
@@ -92,7 +96,6 @@ package hellostream {
 }
 
 package serverservicecall {
-
   import scala.concurrent.Future
 
   class UsingServerServiceCall extends helloservice.HelloService {
@@ -102,7 +105,8 @@ package serverservicecall {
 
     override def sayHello = ServerServiceCall { (requestHeader, name) =>
       val user = requestHeader.principal
-        .map(_.getName).getOrElse("No one")
+        .map(_.getName)
+        .getOrElse("No one")
       val response = s"$user wants to say hello to $name"
 
       val responseHeader = ResponseHeader.Ok
@@ -115,8 +119,8 @@ package serverservicecall {
 }
 
 package servicecallcomposition {
-
-  import scala.concurrent.{ExecutionContext, Future}
+  import scala.concurrent.ExecutionContext
+  import scala.concurrent.Future
   import com.lightbend.lagom.scaladsl.server.ServerServiceCall
 
   object Logging {
@@ -133,9 +137,10 @@ package servicecallcomposition {
     import Logging.logged
 
     //#logged-hello-service
-    override def sayHello = logged(ServerServiceCall { name =>
-      Future.successful(s"Hello $name!")
-    })
+    override def sayHello =
+      logged(ServerServiceCall { name =>
+        Future.successful(s"Hello $name!")
+      })
     //#logged-hello-service
   }
 
@@ -148,16 +153,15 @@ package servicecallcomposition {
   //#user-storage
 
   object Authentication {
-    val userStorage: UserStorage = null
+    val userStorage: UserStorage      = null
     implicit val ec: ExecutionContext = null
 
     //#auth-service-call
     import com.lightbend.lagom.scaladsl.api.transport.Forbidden
 
     def authenticated[Request, Response](
-      serviceCall: User => ServerServiceCall[Request, Response]
+        serviceCall: User => ServerServiceCall[Request, Response]
     ) = ServerServiceCall.composeAsync { requestHeader =>
-
       // First lookup user
       val userLookup = requestHeader.principal
         .map(principal => userStorage.lookupUser(principal.getName))
@@ -166,7 +170,7 @@ package servicecallcomposition {
       // Then, if it exists, apply it to the service call
       userLookup.map {
         case Some(user) => serviceCall(user)
-        case None => throw Forbidden("User must be authenticated to access this service call")
+        case None       => throw Forbidden("User must be authenticated to access this service call")
       }
     }
     //#auth-service-call
@@ -189,7 +193,7 @@ package servicecallcomposition {
 
     //#compose-service-call
     def filter[Request, Response](
-      serviceCall: User => ServerServiceCall[Request, Response]
+        serviceCall: User => ServerServiceCall[Request, Response]
     ) = logged(authenticated(serviceCall))
     //#compose-service-call
   }
@@ -204,5 +208,4 @@ package servicecallcomposition {
     }
     //#filter-hello-service
   }
-
 }

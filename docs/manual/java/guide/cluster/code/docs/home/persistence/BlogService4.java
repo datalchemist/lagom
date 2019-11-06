@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.home.persistence;
 
 import akka.NotUsed;
@@ -15,8 +19,6 @@ public interface BlogService4 extends Service {
 
   @Override
   default Descriptor descriptor() {
-    return named("/blogservice").withCalls(
-      restCall(Method.GET, "/blogs", this::getNewPosts)
-    );
+    return named("/blogservice").withCalls(restCall(Method.GET, "/blogs", this::getNewPosts));
   }
 }

@@ -1,36 +1,45 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.it
 
 import java.util.Optional
 import java.util.concurrent.TimeUnit
-import akka.stream.scaladsl.{ Sink, Flow, Source }
+
+import akka.stream.scaladsl.Sink
+import akka.stream.scaladsl.Flow
+import akka.stream.scaladsl.Source
 import com.lightbend.lagom.it.mocks._
 import akka.Done
 import akka.NotUsed
 import play.api.Application
 import play.api.libs.streams.AkkaStreams
+
 import scala.collection.JavaConverters._
-import scala.concurrent.{ Await, Promise }
+import scala.concurrent.Await
+import scala.concurrent.Promise
 import scala.concurrent.duration._
 import scala.compat.java8.OptionConverters._
-import scala.util.{ Failure, Success, Try }
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
 import akka.pattern.CircuitBreakerOpenException
 import java.util.concurrent.ExecutionException
 
-class JavadslMockServiceSpec extends ServiceSupport {
+import akka.util.ByteString
 
+class JavadslMockServiceSpec extends ServiceSupport {
   def withMockServiceClient(
-    block: Application => MockService => Unit
+      block: Application => MockService => Unit
   )(implicit httpBackend: HttpBackend): Unit =
     withClient[MockService](_.bindings(new MockServiceModule))(block)
 
   List(AkkaHttp, Netty).foreach { implicit backend =>
     s"A mock service (using $backend)" should {
       "be possible to invoke" in withMockServiceClient { implicit app => client =>
-        val id = 10L
-        val request = new MockRequestEntity("bar", 20)
+        val id       = 10L
+        val request  = new MockRequestEntity("bar", 20)
         val response = client.mockCall(id).invoke(request).toCompletableFuture.get(10, TimeUnit.SECONDS)
         response.incomingId should ===(id)
         response.incomingRequest should ===(request)
@@ -40,9 +49,14 @@ class JavadslMockServiceSpec extends ServiceSupport {
         client.doNothing().invoke().toCompletableFuture.get(10, TimeUnit.SECONDS) should ===(NotUsed)
         MockServiceImpl.invoked.get() should ===(true)
       }
-      "be possible to invoke for Done parameters and resonse" in withMockServiceClient { implicit app => client =>
+      "be possible to invoke for Done parameters and response" in withMockServiceClient { implicit app => client =>
         val response = client.doneCall.invoke(Done.getInstance()).toCompletableFuture.get(10, TimeUnit.SECONDS)
         response should ===(Done.getInstance)
+      }
+      "be possible to invoke for ByteString parameters and response" in withMockServiceClient {
+        implicit app => client =>
+          val request = ByteString.fromString("raw ByteString")
+          client.echoByteString().invoke(request).toCompletableFuture.get(10, TimeUnit.SECONDS) should ===(request)
       }
 
       "work with streamed responses" in withMockServiceClient { implicit app => client =>
@@ -51,19 +65,28 @@ class JavadslMockServiceSpec extends ServiceSupport {
           case Success(result) =>
             consume(result.asScala) should ===((1 to 3).map(i => new MockResponseEntity(i, request)))
           case Failure(_) =>
-            println("SKIPPED - This may sometimes fail due to https://github.com/playframework/playframework/issues/5365")
+            println(
+              "SKIPPED - This may sometimes fail due to https://github.com/playframework/playframework/issues/5365"
+            )
         }
       }
 
       "work with streamed responses and unit requests" in withMockServiceClient { implicit app => client =>
         val resultStream = client.unitStreamResponse().invoke().toCompletableFuture.get(10, TimeUnit.SECONDS)
-        consume(resultStream.asScala) should ===((1 to 3).map(i => new MockResponseEntity(i, new MockRequestEntity("entity", i))))
+        consume(resultStream.asScala) should ===(
+          (1 to 3).map(i => new MockResponseEntity(i, new MockRequestEntity("entity", i)))
+        )
       }
       "work with streamed requests" in withMockServiceClient { implicit app => client =>
-        val requests = (1 to 3).map(i => new MockRequestEntity("request", i))
+        val requests    = (1 to 3).map(i => new MockRequestEntity("request", i))
         val gotResponse = Promise[None.type]()
-        val closeWhenGotResponse = Source.maybe[MockRequestEntity].mapMaterializedValue(_.completeWith(gotResponse.future))
-        val result = client.streamRequest().invoke(Source(requests).concat(closeWhenGotResponse).asJava).toCompletableFuture.get(10, TimeUnit.SECONDS)
+        val closeWhenGotResponse =
+          Source.maybe[MockRequestEntity].mapMaterializedValue(_.completeWith(gotResponse.future))
+        val result = client
+          .streamRequest()
+          .invoke(Source(requests).concat(closeWhenGotResponse).asJava)
+          .toCompletableFuture
+          .get(10, TimeUnit.SECONDS)
         gotResponse.success(None)
         result should ===(new MockResponseEntity(1, requests(0)))
       }
@@ -72,10 +95,15 @@ class JavadslMockServiceSpec extends ServiceSupport {
           // In this case, we wait for a response from the server before closing the connection. The response will be an
           // empty web socket message which will be returned to us as null
           MockServiceImpl.firstReceived.set(null)
-          val requests = (1 to 3).map(i => new MockRequestEntity("request", i))
+          val requests    = (1 to 3).map(i => new MockRequestEntity("request", i))
           val gotResponse = Promise[None.type]()
-          val closeWhenGotResponse = Source.maybe[MockRequestEntity].mapMaterializedValue(_.completeWith(gotResponse.future))
-          client.streamRequestUnit().invoke(Source(requests).concat(closeWhenGotResponse).asJava).toCompletableFuture.get(10, TimeUnit.SECONDS) should ===(NotUsed)
+          val closeWhenGotResponse =
+            Source.maybe[MockRequestEntity].mapMaterializedValue(_.completeWith(gotResponse.future))
+          client
+            .streamRequestUnit()
+            .invoke(Source(requests).concat(closeWhenGotResponse).asJava)
+            .toCompletableFuture
+            .get(10, TimeUnit.SECONDS) should ===(NotUsed)
           gotResponse.success(None)
           MockServiceImpl.firstReceived.get() should ===(requests(0))
         }
@@ -83,7 +111,11 @@ class JavadslMockServiceSpec extends ServiceSupport {
           // In this case, we send nothing to the server, which is waiting for a single message before it sends a response,
           // instead we just close the connection, we want to make sure that the client call still returns.
           MockServiceImpl.firstReceived.set(null)
-          client.streamRequestUnit().invoke(Source.empty.asJava).toCompletableFuture.get(10, TimeUnit.SECONDS) should ===(NotUsed)
+          client
+            .streamRequestUnit()
+            .invoke(Source.empty.asJava)
+            .toCompletableFuture
+            .get(10, TimeUnit.SECONDS) should ===(NotUsed)
         }
       }
       "work with bidi streams" when {
@@ -91,33 +123,48 @@ class JavadslMockServiceSpec extends ServiceSupport {
           val requests = (1 to 3).map(i => new MockRequestEntity("request", i))
           // Use a source that never terminates so we don't close the upstream (which would close the downstream), and then
           // use takeUpTo so that we close downstream when we've got everything we want
-          val resultStream = client.bidiStream().invoke(Source(requests).concat(Source.maybe).asJava).toCompletableFuture.get(10, TimeUnit.SECONDS)
+          val resultStream = client
+            .bidiStream()
+            .invoke(Source(requests).concat(Source.maybe).asJava)
+            .toCompletableFuture
+            .get(10, TimeUnit.SECONDS)
           consume(resultStream.asScala.take(3)) should ===(requests.map(r => new MockResponseEntity(1, r)))
         }
         "the server closes the connection" in withMockServiceClient { implicit app => client =>
-          val requests = (1 to 3).map(i => new MockRequestEntity("request", i))
+          val requests    = (1 to 3).map(i => new MockRequestEntity("request", i))
           val gotResponse = Promise[None.type]()
-          val closeWhenGotResponse = Source.maybe[MockRequestEntity].mapMaterializedValue(_.completeWith(gotResponse.future))
+          val closeWhenGotResponse =
+            Source.maybe[MockRequestEntity].mapMaterializedValue(_.completeWith(gotResponse.future))
           val serverClosed = Promise[Done]()
-          val trackServerClosed = AkkaStreams.ignoreAfterCancellation[MockResponseEntity].mapMaterializedValue(serverClosed.completeWith)
-          val resultStream = client.bidiStream().invoke(Source(requests).concat(closeWhenGotResponse).asJava).toCompletableFuture.get(10, TimeUnit.SECONDS)
-          consume(resultStream.asScala via trackServerClosed take 3) should ===(requests.map(r => new MockResponseEntity(1, r)))
+          val trackServerClosed =
+            AkkaStreams.ignoreAfterCancellation[MockResponseEntity].mapMaterializedValue(serverClosed.completeWith)
+          val resultStream = client
+            .bidiStream()
+            .invoke(Source(requests).concat(closeWhenGotResponse).asJava)
+            .toCompletableFuture
+            .get(10, TimeUnit.SECONDS)
+          consume(resultStream.asScala.via(trackServerClosed).take(3)) should ===(
+            requests.map(r => new MockResponseEntity(1, r))
+          )
           gotResponse.success(None)
           Await.result(serverClosed.future, 10.seconds) should ===(Done)
         }
       }
       "work with custom headers" in withMockServiceClient { implicit app => client =>
         val consumer = new MockServiceClientConsumer(client)
-        val result = consumer.invokeCustomHeaders("Foo-Header", "Bar").toCompletableFuture.get(10, TimeUnit.SECONDS)
+        val result   = consumer.invokeCustomHeaders("Foo-Header", "Bar").toCompletableFuture.get(10, TimeUnit.SECONDS)
         result.second should ===("Bar")
         result.first.getHeader("Header-Name").asScala should ===(Some("Foo-Header"))
         result.first.status should ===(201)
       }
       "work with custom headers on streams" in withMockServiceClient { implicit app => client =>
         val consumer = new MockServiceClientConsumer(client)
-        val result = consumer.invokeStreamCustomHeaders(
-          Seq(akka.japi.Pair("Header-1", "value1"), akka.japi.Pair("Header-2", "value2")).asJava
-        ).toCompletableFuture.get(10, TimeUnit.SECONDS)
+        val result = consumer
+          .invokeStreamCustomHeaders(
+            Seq(akka.japi.Pair("Header-1", "value1"), akka.japi.Pair("Header-2", "value2")).asJava
+          )
+          .toCompletableFuture
+          .get(10, TimeUnit.SECONDS)
         val values = consume(result.asScala.via(Flow[String].take(2)))
         values should ===(Seq("value1", "value2"))
       }
@@ -125,17 +172,18 @@ class JavadslMockServiceSpec extends ServiceSupport {
         client.serviceName().invoke().toCompletableFuture.get(10, TimeUnit.SECONDS) should ===("mockservice")
       }
       "send the service name on streams" in withMockServiceClient { implicit app => client =>
-        Await.result(client.streamServiceName().invoke().toCompletableFuture.get(10, TimeUnit.SECONDS)
-          .asScala.runWith(Sink.head), 10.seconds) should ===("mockservice")
+        Await.result(
+          client.streamServiceName().invoke().toCompletableFuture.get(10, TimeUnit.SECONDS).asScala.runWith(Sink.head),
+          10.seconds
+        ) should ===("mockservice")
       }
 
       "work with query params" in withMockServiceClient { implicit app => client =>
-        client.queryParamId(Optional.of("foo")).invoke()
-          .toCompletableFuture.get(10, TimeUnit.SECONDS) should ===("foo")
+        client.queryParamId(Optional.of("foo")).invoke().toCompletableFuture.get(10, TimeUnit.SECONDS) should ===("foo")
       }
 
       "work with collections of entities" in withMockServiceClient { implicit app => client =>
-        val request = new MockRequestEntity("results", 10)
+        val request  = new MockRequestEntity("results", 10)
         val response = client.listResults().invoke(request).toCompletableFuture.get(10, TimeUnit.SECONDS)
 
         response.size() should ===(request.field2)
@@ -143,16 +191,16 @@ class JavadslMockServiceSpec extends ServiceSupport {
 
       "work with custom serializers" when {
         "the serializer protocol uses a custom contentType" in withMockServiceClient { implicit app => client =>
-          val id = 20
-          val request = new MockRequestEntity("bar", id)
+          val id       = 20
+          val request  = new MockRequestEntity("bar", id)
           val response = client.customContentType().invoke(request).toCompletableFuture.get(10, TimeUnit.SECONDS)
           response.incomingId should ===(id)
           response.incomingRequest should ===(request)
         }
 
         "the serializer protocol does not specify a contentType" in withMockServiceClient { implicit app => client =>
-          val id = 20
-          val request = new MockRequestEntity("bar", id)
+          val id       = 20
+          val request  = new MockRequestEntity("bar", id)
           val response = client.noContentType().invoke(request).toCompletableFuture.get(10, TimeUnit.SECONDS)
           response.incomingId should ===(id)
           response.incomingRequest should ===(request)
@@ -177,8 +225,6 @@ class JavadslMockServiceSpec extends ServiceSupport {
         }
         MockServiceImpl.invoked.get() should ===(false)
       }
-
     }
   }
-
 }

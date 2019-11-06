@@ -1,12 +1,14 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.javadsl.api
 
-import org.scalatest.{ Inside, Matchers, WordSpec }
+import org.scalatest.Inside
+import org.scalatest.Matchers
+import org.scalatest.WordSpec
 
 class ScalaSupportSpec extends WordSpec with Matchers with Inside {
-
   "scala support" should {
     "resolve a function" in {
       val method: ScalaServiceSupport.ScalaMethodCall[String] = testMethod _
@@ -16,5 +18,4 @@ class ScalaSupportSpec extends WordSpec with Matchers with Inside {
   }
 
   def testMethod(s: String): String = s
-
 }

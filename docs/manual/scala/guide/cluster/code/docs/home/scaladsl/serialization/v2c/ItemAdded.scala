@@ -1,23 +1,23 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package docs.home.scaladsl.serialization.v2c
 
-import com.lightbend.lagom.scaladsl.playjson.{JsonMigration, JsonMigrations, JsonSerializerRegistry}
-import play.api.libs.json.{JsObject, JsPath, JsString}
+import com.lightbend.lagom.scaladsl.playjson.JsonMigration
+import com.lightbend.lagom.scaladsl.playjson.JsonMigrations
+import com.lightbend.lagom.scaladsl.playjson.JsonSerializerRegistry
+import play.api.libs.json.JsObject
+import play.api.libs.json.JsPath
+import play.api.libs.json.JsString
 
 import scala.collection.immutable
 
 //#rename
-case class ItemAdded(
-    shoppingCartId: String,
-    itemId: String,
-    quantity: Int)
+case class ItemAdded(shoppingCartId: String, itemId: String, quantity: Int)
 //#rename
 
-
 object ItemAddedMigration {
-
   class ShopSerializerRegistry1 extends JsonSerializerRegistry {
     override def serializers = Vector.empty
 
@@ -40,21 +40,23 @@ object ItemAddedMigration {
   }
 
   class ShopSerializerRegistry2 extends JsonSerializerRegistry {
-
     override val serializers = Vector.empty
 
     //#transformer-migration
     val productIdToItemId =
-    JsPath.json.update(
-      (JsPath \ "itemId").json.copyFrom((JsPath \ "productId").json.pick)
-    ) andThen (JsPath \ "productId").json.prune
+      JsPath.json
+        .update(
+          (JsPath \ "itemId").json.copyFrom((JsPath \ "productId").json.pick)
+        )
+        .andThen((JsPath \ "productId").json.prune)
 
     override def migrations = Map[String, JsonMigration](
-      JsonMigrations.transform[ItemAdded](immutable.SortedMap(
-        1 -> productIdToItemId
-      ))
+      JsonMigrations.transform[ItemAdded](
+        immutable.SortedMap(
+          1 -> productIdToItemId
+        )
+      )
     )
     //#transformer-migration
   }
-
 }

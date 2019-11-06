@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.persistence
 
 import scala.collection.immutable
@@ -32,7 +33,9 @@ object PersistentEntity {
   /**
    * Exception that is used when command is not handled
    */
-  final case class UnhandledCommandException(message: String) extends IllegalArgumentException(message) with NoStackTrace
+  final case class UnhandledCommandException(message: String)
+      extends IllegalArgumentException(message)
+      with NoStackTrace
 
   /**
    * Exception that is used when persist fails.
@@ -77,6 +80,10 @@ object PersistentEntity {
  * successfully. Replies are sent with the `reply` method of the context that is passed
  * to the command handler function.
  *
+ * The command handlers may emit zero, one or many events. When many events are emitted,
+ * they are stored atomically and in the same order they were emitted. Only after persisting
+ * all the events external side effects will be performed.
+ *
  * The event handlers are typically only updating the state, but they may also change
  * the behavior of the entity in the sense that new functions for processing commands
  * and events may be defined for a given state. This is useful when implementing
@@ -93,19 +100,18 @@ object PersistentEntity {
  * @tparam State the type of the state
  */
 abstract class PersistentEntity {
-
   type Command
   type Event
   type State
 
-  type Behavior = State => Actions
-  type EventHandler = PartialFunction[(Event, State), State]
-  private[lagom]type CommandHandler = PartialFunction[(Command, CommandContext[Any], State), Persist]
-  private[lagom]type ReadOnlyCommandHandler = PartialFunction[(Command, ReadOnlyCommandContext[Any], State), Unit]
+  type Behavior                              = State => Actions
+  type EventHandler                          = PartialFunction[(Event, State), State]
+  private[lagom] type CommandHandler         = PartialFunction[(Command, CommandContext[Any], State), Persist]
+  private[lagom] type ReadOnlyCommandHandler = PartialFunction[(Command, ReadOnlyCommandContext[Any], State), Unit]
 
   private var _entityId: String = _
 
-  final protected def entityId: String = _entityId
+  protected final def entityId: String = _entityId
 
   /**
    * INTERNAL API
@@ -138,7 +144,7 @@ abstract class PersistentEntity {
   def recoveryCompleted(state: State): State = state
 
   object Actions {
-    val empty = new Actions(PartialFunction.empty, Map.empty)
+    val empty            = new Actions(PartialFunction.empty, Map.empty)
     def apply(): Actions = empty
   }
 
@@ -147,10 +153,9 @@ abstract class PersistentEntity {
    * and persisted events. `Actions` is an immutable class.
    */
   class Actions(
-    val eventHandler:    EventHandler,
-    val commandHandlers: Map[Class[_], CommandHandler]
+      val eventHandler: EventHandler,
+      val commandHandlers: Map[Class[_], CommandHandler]
   ) extends (State => Actions) {
-
     /**
      * Extends `State => Actions` so that it can be used directly in
      * [[PersistentEntity#behavior]] when there is only one set of actions
@@ -166,7 +171,7 @@ abstract class PersistentEntity {
      * [[#orElse]] method.
      */
     def onCommand[C <: Command with PersistentEntity.ReplyType[Reply]: ClassTag, Reply](
-      handler: PartialFunction[(Command, CommandContext[Reply], State), Persist]
+        handler: PartialFunction[(Command, CommandContext[Reply], State), Persist]
     ): Actions = {
       val commandClass = implicitly[ClassTag[C]].runtimeClass.asInstanceOf[Class[C]]
       new Actions(eventHandler, commandHandlers.updated(commandClass, handler.asInstanceOf[CommandHandler]))
@@ -181,7 +186,7 @@ abstract class PersistentEntity {
      * [[#orElse]] method.
      */
     def onReadOnlyCommand[C <: Command with PersistentEntity.ReplyType[Reply]: ClassTag, Reply](
-      handler: PartialFunction[(Command, ReadOnlyCommandContext[Reply], State), Unit]
+        handler: PartialFunction[(Command, ReadOnlyCommandContext[Reply], State), Unit]
     ): Actions = {
       val delegate: PartialFunction[(Command, CommandContext[Reply], State), Persist] = {
         case params @ (_, ctx, _) if handler.isDefinedAt(params) =>
@@ -211,12 +216,11 @@ abstract class PersistentEntity {
      * partial functions.
      */
     def orElse(b: Actions): Actions = {
-      val commandsInBoth = commandHandlers.keySet intersect b.commandHandlers.keySet
+      val commandsInBoth = commandHandlers.keySet.intersect(b.commandHandlers.keySet)
       val newCommandHandlers = commandHandlers ++ b.commandHandlers ++
         commandsInBoth.map(c => c -> commandHandlers(c).orElse(b.commandHandlers(c)))
       new Actions(eventHandler.orElse(b.eventHandler), newCommandHandlers)
     }
-
   }
 
   /**
@@ -226,7 +230,6 @@ abstract class PersistentEntity {
    * @tparam R the reply type of the command
    */
   abstract class ReadOnlyCommandContext[R] {
-
     /**
      * Send reply to a command. The type `R` must be the reply type defined by
      * the command.
@@ -253,7 +256,6 @@ abstract class PersistentEntity {
    * @tparam R the reply type of the command
    */
   abstract class CommandContext[R] extends ReadOnlyCommandContext[R] {
-
     /**
      * A command handler may return this `Persist` directive to define
      * that one event is to be persisted. External side effects can be
@@ -267,17 +269,17 @@ abstract class PersistentEntity {
      * that several events are to be persisted. External side effects can be
      * performed after successful persist in the `afterPersist` function.
      * `afterPersist` is invoked once when all events have been persisted
-     * successfully.
+     * successfully. Events will be persisted atomically and in the same
+     * order as they are passed here.
      */
     def thenPersistAll(events: Event*)(afterPersist: () => Unit = () => ()): Persist =
-      PersistAll(events.to[immutable.Seq], afterPersist)
+      PersistAll(events.toIndexedSeq, afterPersist)
 
     /**
      * A command handler may return this `Persist` directive to define
      * that no events are to be persisted.
      */
     def done[B <: Event]: Persist = PersistNone
-
   }
 
   /**
@@ -301,5 +303,4 @@ abstract class PersistentEntity {
    * INTERNAL API
    */
   private[lagom] case object PersistNone extends Persist
-
 }

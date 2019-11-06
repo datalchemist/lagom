@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.services;
 
 import akka.NotUsed;
@@ -12,7 +16,7 @@ public class ServiceClients {
     ServiceCall<NotUsed, String> sayHelloLagom();
   }
 
-  //#hello-consumer
+  // #hello-consumer
   public class MyServiceImpl implements MyService {
     private final HelloService helloService;
 
@@ -25,12 +29,10 @@ public class ServiceClients {
     public ServiceCall<NotUsed, String> sayHelloLagom() {
       return msg -> {
         CompletionStage<String> response = helloService.sayHello().invoke("Lagom");
-        return response.thenApply(answer ->
-            "Hello service said: " + answer
-        );
+        return response.thenApply(answer -> "Hello service said: " + answer);
       };
     }
   }
-  //#hello-consumer
+  // #hello-consumer
 
 }

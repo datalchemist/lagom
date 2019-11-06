@@ -31,7 +31,7 @@ When using a streaming service client, Lagom will use internally a WebSocket cli
 
 This configuration will affect all streaming services that the service client consumes. It is not possible to provide different configurations when multiple streaming services are consumed.
 
-Note that the same parameter has to be configured on the server-side using [Play server configuration](https://www.playframework.com/documentation/2.6.x/JavaWebSockets#Configuring-WebSocket-Frame-Length)
+Note that the same parameter has to be configured on the server-side using [Play server configuration](https://www.playframework.com/documentation/2.7.x/JavaWebSockets#Configuring-WebSocket-Frame-Length)
 
 ## Circuit Breakers
 
@@ -69,6 +69,8 @@ All service calls with Lagom service clients are by default using circuit breake
 
 In the above example the default identifier is used for the `sayHi` method, since no specific identifier is given. The default identifier is the same as the service name, i.e. `"hello"` in this example. The `hiAgain` method will use another circuit breaker instance, since `"hello2"` is specified as circuit breaker identifier.
 
+See [CircuitBreakerPanel recipe](https://github.com/lagom/lagom-recipes/tree/master/circuitbreakerpanel/circuitbreakerpanel-java-mvn) for an example you can use with any arbitrary API to apply the circuit breaker pattern.
+
 ### Circuit Breaker Configuration
 
 On the client side you can configure the circuit breakers. The default configuration is:
@@ -97,10 +99,4 @@ With the above "hello" example we could adjust the configuration by defining pro
       default.call-timeout = 5s
     }
 
-Information about the status of the circuit breakers and some metrics for throughput and latency are provided by the built in `MetricsService` that is available at the following paths of each service:
-
-* `/_status/circuit-breaker/current` - Snapshot of current circuit breaker status
-* `/_status/circuit-breaker/stream` - Stream of circuit breaker status
-
 [Lightbend Monitoring](https://www.lightbend.com/products/monitoring) will provide metrics for Lagom circuit breakers, including aggregated views of the information for all nodes in the cluster.
-

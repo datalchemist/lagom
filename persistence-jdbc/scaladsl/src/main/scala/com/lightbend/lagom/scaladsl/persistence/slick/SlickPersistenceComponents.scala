@@ -1,11 +1,13 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.persistence.slick
 
 import com.lightbend.lagom.internal.scaladsl.persistence.slick.SlickReadSideImpl
 import com.lightbend.lagom.scaladsl.persistence.PersistenceComponents
-import com.lightbend.lagom.scaladsl.persistence.jdbc.{ ReadSideJdbcPersistenceComponents, WriteSideJdbcPersistenceComponents }
+import com.lightbend.lagom.scaladsl.persistence.jdbc.ReadSideJdbcPersistenceComponents
+import com.lightbend.lagom.scaladsl.persistence.jdbc.WriteSideJdbcPersistenceComponents
 import slick.jdbc.JdbcBackend.Database
 import slick.jdbc.JdbcProfile
 
@@ -13,23 +15,20 @@ import slick.jdbc.JdbcProfile
  * Persistence Slick components (for compile-time injection).
  */
 trait SlickPersistenceComponents
-  extends PersistenceComponents
-  with ReadSideSlickPersistenceComponents
-  with WriteSideSlickPersistenceComponents
+    extends PersistenceComponents
+    with ReadSideSlickPersistenceComponents
+    with WriteSideSlickPersistenceComponents
 
 /**
  * Write-side persistence Slick components (for compile-time injection).
  */
-trait WriteSideSlickPersistenceComponents
-  extends WriteSideJdbcPersistenceComponents
+trait WriteSideSlickPersistenceComponents extends WriteSideJdbcPersistenceComponents
 
 /**
  * Read-side persistence Slick components (for compile-time injection).
  */
-trait ReadSideSlickPersistenceComponents
-  extends ReadSideJdbcPersistenceComponents {
-
+trait ReadSideSlickPersistenceComponents extends ReadSideJdbcPersistenceComponents {
   lazy val slickReadSide: SlickReadSide = new SlickReadSideImpl(slickProvider, slickOffsetStore)(executionContext)
-  lazy val db: Database = slickProvider.db
-  lazy val profile: JdbcProfile = slickProvider.profile
+  lazy val db: Database                 = slickProvider.db
+  lazy val profile: JdbcProfile         = slickProvider.profile
 }

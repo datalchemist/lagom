@@ -1,15 +1,19 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal
 
-import io.netty.channel.{ Channel, ChannelFuture, ChannelFutureListener }
-import io.netty.util.concurrent.{ GenericFutureListener, Future => NettyFuture }
+import io.netty.channel.Channel
+import io.netty.channel.ChannelFuture
+import io.netty.channel.ChannelFutureListener
+import io.netty.util.concurrent.GenericFutureListener
+import io.netty.util.concurrent.{ Future => NettyFuture }
 
-import scala.concurrent.{ Future, Promise }
+import scala.concurrent.Future
+import scala.concurrent.Promise
 
 object NettyFutureConverters {
-
   implicit class ToFuture[T](future: NettyFuture[T]) {
     def toScala: Future[T] = {
       val promise = Promise[T]()
@@ -45,5 +49,4 @@ object NettyFutureConverters {
       promise.future
     }
   }
-
 }

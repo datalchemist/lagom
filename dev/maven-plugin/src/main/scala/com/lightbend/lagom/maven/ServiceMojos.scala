@@ -1,51 +1,30 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.maven
 
 import java.io.File
-import javax.inject.Inject
+import java.util.Collections
+import java.util.{ List => JList }
 
-import com.lightbend.lagom.dev.{ Colors, ConsoleHelper }
 import com.lightbend.lagom.dev.PortAssigner.ProjectName
+import com.lightbend.lagom.dev.Colors
+import com.lightbend.lagom.dev.ConsoleHelper
+import com.lightbend.lagom.dev.ServiceBindingInfo
+import javax.inject.Inject
+import org.apache.maven.RepositoryUtils
 import org.apache.maven.execution.MavenSession
 import org.apache.maven.model.Dependency
+import org.apache.maven.plugin.AbstractMojo
 
 import scala.beans.BeanProperty
-import java.util.{ Collections, List => JList }
-
-import org.apache.maven.RepositoryUtils
-
 import scala.collection.JavaConverters._
-
-/**
- * Run a service, blocking until the user hits enter before stopping it again.
- */
-class RunMojo @Inject() (mavenFacade: MavenFacade, logger: MavenLoggerProxy, session: MavenSession) extends LagomAbstractMojo {
-
-  private val consoleHelper = new ConsoleHelper(new Colors("lagom.noformat"))
-
-  override def execute(): Unit = {
-    val project = session.getCurrentProject
-    mavenFacade.executeMavenPluginGoal(project, "start")
-
-    val serviceUrl = LagomKeys.LagomServiceUrl.get(project).getOrElse {
-      sys.error(s"Service ${project.getArtifactId} is not running?")
-    }
-
-    consoleHelper.printStartScreen(logger, Seq(project.getArtifactId -> serviceUrl))
-
-    consoleHelper.blockUntilExit()
-
-    mavenFacade.executeMavenPluginGoal(project, "stop")
-  }
-}
 
 /**
  * Start a service.
  */
-class StartMojo @Inject() (serviceManager: ServiceManager, session: MavenSession) extends LagomAbstractMojo {
-
+class StartMojo @Inject() (serviceManager: ServiceManager, session: MavenSession) extends AbstractMojo {
   @BeanProperty
   var lagomService: Boolean = _
 
@@ -53,7 +32,20 @@ class StartMojo @Inject() (serviceManager: ServiceManager, session: MavenSession
   var playService: Boolean = _
 
   @BeanProperty
+  var serviceAddress: String = _
+
+  @BeanProperty
+  var serviceEnableSsl: Boolean = _
+
+  /** @deprecated As of release 1.5.0. Use serviceHttpPort instead */
+  @BeanProperty @Deprecated
   var servicePort: Int = _
+
+  @BeanProperty
+  var serviceHttpPort: Int = _
+
+  @BeanProperty
+  var serviceHttpsPort: Int = _
 
   @BeanProperty
   var servicePortRange: PortRangeBean = new PortRangeBean
@@ -80,6 +72,20 @@ class StartMojo @Inject() (serviceManager: ServiceManager, session: MavenSession
   var watchDirs: JList[String] = Collections.emptyList()
 
   override def execute(): Unit = {
+    if (servicePort != -1) {
+      // this property is also marked as deprecated in
+      // the plugin.xml descriptor, but somehow mvn is not printing anything. Therefore, we add a warning ourselves.
+      getLog.warn(
+        "Lagom's maven plugin property 'servicePort' is deprecated as of release 1.5.0. Use serviceHttpPort instead."
+      )
+      // for backward compatibility, we must set the http port to servicePort
+      // if the later was configured by the user
+      if (serviceHttpPort == -1) serviceHttpPort = servicePort
+      else
+        getLog.warn(
+          s"Both 'serviceHttpPort' ($serviceHttpPort) and 'servicePort' ($servicePort) are configured, 'servicePort' will be ignored"
+        )
+    }
 
     val project = session.getCurrentProject
 
@@ -100,32 +106,52 @@ class StartMojo @Inject() (serviceManager: ServiceManager, session: MavenSession
       case (true, configured) => Some(configured)
     }
 
-    val selectedPort = if (servicePort == -1) {
-      val portMap = serviceManager.getPortMap(
-        servicePortRange,
-        externalProjects.asScala.map(d => d.artifact.getGroupId + ":" + d.artifact.getArtifactId)
-      )
-      val port = portMap.get(ProjectName(project.getArtifactId))
-      port.map(_.value).getOrElse {
-        sys.error("No port selected for service " + project.getArtifactId)
+    def selectPort(servicePort: Int, useTls: Boolean): Int = {
+      if (servicePort == -1) {
+        val portMap = serviceManager.getPortMap(
+          servicePortRange,
+          externalProjects.asScala.map(d => d.artifact.getGroupId + ":" + d.artifact.getArtifactId),
+          serviceEnableSsl
+        )
+        val portName = {
+          val pn = ProjectName(project.getArtifactId)
+          if (useTls) pn.withTls else pn
+        }
+        val port = portMap.get(portName)
+        port.map(_.value).getOrElse {
+          sys.error(s"No port selected for service ${project.getArtifactId} (use TLS: $useTls)")
+        }
+      } else {
+        servicePort
       }
-    } else {
-      servicePort
     }
+
+    val selectedPort = selectPort(serviceHttpPort, useTls = false)
+    val selectedHttpsPort =
+      if (serviceEnableSsl) selectPort(serviceHttpsPort, useTls = true)
+      else -1
 
     val cassandraPort = if (cassandraEnabled) {
       Some(this.cassandraPort)
     } else None
 
-    serviceManager.startServiceDevMode(project, selectedPort, serviceLocatorUrl, cassandraPort, playService = playService, resolvedWatchDirs)
+    serviceManager.startServiceDevMode(
+      project,
+      serviceAddress,
+      selectedPort,
+      selectedHttpsPort,
+      serviceLocatorUrl,
+      cassandraPort,
+      playService,
+      resolvedWatchDirs
+    )
   }
 }
 
 /**
  * Stop a service.
  */
-class StopMojo @Inject() (serviceManager: ServiceManager, session: MavenSession) extends LagomAbstractMojo {
-
+class StopMojo @Inject() (serviceManager: ServiceManager, session: MavenSession) extends AbstractMojo {
   @BeanProperty
   var lagomService: Boolean = _
 
@@ -143,13 +169,18 @@ class StopMojo @Inject() (serviceManager: ServiceManager, session: MavenSession)
   }
 }
 
-class StartExternalProjects @Inject() (serviceManager: ServiceManager, session: MavenSession) extends LagomAbstractMojo {
-
+class StartExternalProjects @Inject() (serviceManager: ServiceManager, session: MavenSession) extends AbstractMojo {
   @BeanProperty
   var externalProjects: JList[ExternalProject] = Collections.emptyList()
 
   @BeanProperty
+  var serviceEnableSsl: Boolean = false
+
+  @BeanProperty
   var servicePortRange: PortRangeBean = new PortRangeBean
+
+  @BeanProperty
+  var serviceAddress: String = _
 
   @BeanProperty
   var serviceLocatorPort: Int = _
@@ -167,7 +198,6 @@ class StartExternalProjects @Inject() (serviceManager: ServiceManager, session: 
   var cassandraPort: Int = _
 
   override def execute(): Unit = {
-
     val serviceLocatorUrl = (serviceLocatorEnabled, this.serviceLocatorUrl) match {
       case (false, _)         => None
       case (true, null)       => Some(s"http://localhost:$serviceLocatorPort")
@@ -180,42 +210,64 @@ class StartExternalProjects @Inject() (serviceManager: ServiceManager, session: 
 
     lazy val portMap = serviceManager.getPortMap(
       servicePortRange,
-      externalProjects.asScala.map(d => d.artifact.getGroupId + ":" + d.artifact.getArtifactId)
+      externalProjects.asScala.map(d => d.artifact.getGroupId + ":" + d.artifact.getArtifactId),
+      serviceEnableSsl
     )
 
     externalProjects.asScala.foreach { project =>
       if (project.artifact == null || project.artifact.getGroupId == null || project.artifact.getArtifactId == null ||
-        project.artifact.getVersion == null) {
+          project.artifact.getVersion == null) {
         sys.error("External projects must specify an artifact with a groupId, artifactId and version")
       }
 
-      val selectedPort = if (project.servicePort == -1) {
-        val port = portMap.get(ProjectName(project.artifact.getGroupId + ":" + project.artifact.getArtifactId))
-        port.map(_.value).getOrElse {
-          sys.error("No port selected for service " + project.artifact.getArtifactId)
+      def selectPort(servicePort: Int, useTls: Boolean) = {
+        if (servicePort == -1) {
+          val artifactBasename = project.artifact.getGroupId + ":" + project.artifact.getArtifactId
+
+          val portName = {
+            val pn = ProjectName(artifactBasename)
+            if (useTls) pn.withTls else pn
+          }
+          val port = portMap.get(portName)
+          port.map(_.value).getOrElse {
+            sys.error(s"No port selected for service $artifactBasename (use TLS: $useTls)")
+          }
+        } else {
+          servicePort
         }
-      } else {
-        project.servicePort
       }
+
+      val selectedPort = selectPort(project.serviceHttpPort, useTls = false)
+      val selectedHttpsPort =
+        if (serviceEnableSsl) selectPort(project.serviceHttpsPort, useTls = true)
+        else -1
 
       val serviceCassandraPort = cassandraPort.filter(_ => project.cassandraEnabled)
 
-      val dependency = RepositoryUtils.toDependency(project.artifact, session.getRepositorySession.getArtifactTypeRegistry)
+      val dependency =
+        RepositoryUtils.toDependency(project.artifact, session.getRepositorySession.getArtifactTypeRegistry)
 
-      serviceManager.startExternalProject(dependency, selectedPort, serviceLocatorUrl, serviceCassandraPort, playService = project.playService)
+      serviceManager.startExternalProject(
+        dependency,
+        serviceAddress,
+        selectedPort,
+        selectedHttpsPort,
+        serviceLocatorUrl,
+        serviceCassandraPort,
+        project.playService
+      )
     }
   }
-
 }
 
-class StopExternalProjects @Inject() (serviceManager: ServiceManager, session: MavenSession) extends LagomAbstractMojo {
-
+class StopExternalProjects @Inject() (serviceManager: ServiceManager, session: MavenSession) extends AbstractMojo {
   @BeanProperty
   var externalProjects: JList[ExternalProject] = Collections.emptyList()
 
   override def execute(): Unit = {
     externalProjects.asScala.foreach { project =>
-      val dependency = RepositoryUtils.toDependency(project.artifact, session.getRepositorySession.getArtifactTypeRegistry)
+      val dependency =
+        RepositoryUtils.toDependency(project.artifact, session.getRepositorySession.getArtifactTypeRegistry)
       serviceManager.stopExternalProject(dependency)
     }
   }
@@ -228,8 +280,15 @@ class ExternalProject {
   @BeanProperty
   var playService: Boolean = false
 
-  @BeanProperty
+  /** @deprecated As of release 1.5.0. Use serviceHttpPort instead. */
+  @BeanProperty @Deprecated
   var servicePort: Int = -1
+
+  @BeanProperty
+  var serviceHttpPort: Int = -1
+
+  @BeanProperty
+  var serviceHttpsPort: Int = -1
 
   @BeanProperty
   var cassandraEnabled: Boolean = true
@@ -238,12 +297,11 @@ class ExternalProject {
 /**
  * Starts all services.
  */
-class StartAllMojo @Inject() (facade: MavenFacade, logger: MavenLoggerProxy, session: MavenSession) extends LagomAbstractMojo {
-
-  private val consoleHelper = new ConsoleHelper(new Colors("lagom.noformat"))
+class StartAllMojo @Inject() (facade: MavenFacade, logger: MavenLoggerProxy, session: MavenSession)
+    extends AbstractMojo {
+  private val consoleHelper: ConsoleHelper = new ConsoleHelper(new Colors("lagom.noformat"))
 
   override def execute(): Unit = {
-
     val services = facade.locateServices
 
     executeGoal("startKafka")
@@ -256,7 +314,7 @@ class StartAllMojo @Inject() (facade: MavenFacade, logger: MavenLoggerProxy, ses
     }
   }
 
-  def executeGoal(name: String) = {
+  def executeGoal(name: String): Boolean = {
     facade.executeMavenPluginGoal(session.getCurrentProject, name)
   }
 }
@@ -264,8 +322,7 @@ class StartAllMojo @Inject() (facade: MavenFacade, logger: MavenLoggerProxy, ses
 /**
  * Stops all services.
  */
-class StopAllMojo @Inject() (facade: MavenFacade, session: MavenSession) extends LagomAbstractMojo {
-
+class StopAllMojo @Inject() (facade: MavenFacade, session: MavenSession) extends AbstractMojo {
   @BeanProperty
   var externalProjects: JList[Dependency] = Collections.emptyList()
 
@@ -290,23 +347,55 @@ class StopAllMojo @Inject() (facade: MavenFacade, session: MavenSession) extends
 /**
  * Run a service, blocking until the user hits enter before stopping it again.
  */
-class RunAllMojo @Inject() (facade: MavenFacade, logger: MavenLoggerProxy, session: MavenSession) extends LagomAbstractMojo {
+class RunMojo @Inject() (mavenFacade: MavenFacade, logger: MavenLoggerProxy, session: MavenSession)
+    extends AbstractMojo {
+  // This Mojo shares a lot of code (duplicate) with RunAllMojo
+  private val consoleHelper = new ConsoleHelper(new Colors("lagom.noformat"))
 
+  override def execute(): Unit = {
+    val project = session.getCurrentProject
+    mavenFacade.executeMavenPluginGoal(project, "start")
+
+    val bindingInfo: ServiceBindingInfo =
+      LagomKeys.LagomServiceBindings
+        .get(project)
+        .map { bindings =>
+          ServiceBindingInfo(project.getArtifactId, bindings)
+        }
+        .getOrElse {
+          sys.error(s"Service ${project.getArtifactId} is not running?")
+        }
+
+    consoleHelper.printStartScreen(logger, Seq(bindingInfo))
+    consoleHelper.blockUntilExit()
+    mavenFacade.executeMavenPluginGoal(project, "stop")
+  }
+}
+
+/**
+ * Run a service, blocking until the user hits enter before stopping it again.
+ */
+class RunAllMojo @Inject() (facade: MavenFacade, logger: MavenLoggerProxy, session: MavenSession) extends AbstractMojo {
+  // This Mojo shares a lot of code (duplicate) with RunMojo
   val consoleHelper = new ConsoleHelper(new Colors("lagom.noformat"))
 
   override def execute(): Unit = {
-
     val services = facade.locateServices
 
     executeGoal("startAll")
 
-    val serviceUrls = services.map { project =>
-      project.getArtifactId -> LagomKeys.LagomServiceUrl.get(project).getOrElse {
-        sys.error(s"Service ${project.getArtifactId} is not running?")
-      }
+    val bindingInfos: Seq[ServiceBindingInfo] = services.map { project =>
+      LagomKeys.LagomServiceBindings
+        .get(project)
+        .map { bindings =>
+          ServiceBindingInfo(project.getArtifactId, bindings)
+        }
+        .getOrElse {
+          sys.error(s"Service ${project.getArtifactId} is not running?")
+        }
     }
 
-    consoleHelper.printStartScreen(logger, serviceUrls)
+    consoleHelper.printStartScreen(logger, bindingInfos)
 
     consoleHelper.blockUntilExit()
 

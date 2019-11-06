@@ -1,31 +1,38 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.server
 
 import java.net.URI
+import java.util
+import java.util.Optional
 
-import akka.actor.setup.ActorSystemSetup
-import akka.actor.{ ActorSystem, BootstrapSetup, CoordinatedShutdown }
-import akka.event.Logging
+import akka.actor.ActorSystem
 import com.lightbend.lagom.internal.scaladsl.client.ScaladslServiceResolver
 import com.lightbend.lagom.internal.scaladsl.server.ScaladslServerMacroImpl
-import com.lightbend.lagom.internal.spi.{ CircuitBreakerMetricsProvider, ServiceAcl, ServiceDescription, ServiceDiscovery }
+import com.lightbend.lagom.internal.spi.CircuitBreakerMetricsProvider
+import com.lightbend.lagom.internal.spi.ServiceAcl
+import com.lightbend.lagom.internal.spi.ServiceDescription
+import com.lightbend.lagom.internal.spi.ServiceDiscovery
 import com.lightbend.lagom.scaladsl.api.Descriptor.Call
 import com.lightbend.lagom.scaladsl.api._
 import com.lightbend.lagom.scaladsl.api.deser.DefaultExceptionSerializer
-import com.lightbend.lagom.scaladsl.client.{ CircuitBreakerComponents, CircuitBreakingServiceLocator, LagomServiceClientComponents }
-import com.lightbend.lagom.scaladsl.playjson.{ EmptyJsonSerializerRegistry, JsonSerializerRegistry, ProvidesJsonSerializerRegistry }
+import com.lightbend.lagom.scaladsl.client.CircuitBreakerComponents
+import com.lightbend.lagom.scaladsl.client.CircuitBreakingServiceLocator
+import com.lightbend.lagom.scaladsl.client.LagomServiceClientComponents
+import com.lightbend.lagom.scaladsl.playjson.EmptyJsonSerializerRegistry
+import com.lightbend.lagom.scaladsl.playjson.JsonSerializerRegistry
+import com.lightbend.lagom.scaladsl.playjson.ProvidesJsonSerializerRegistry
 import com.typesafe.config.Config
 import play.api.ApplicationLoader.Context
 import play.api._
 import play.api.inject.DefaultApplicationLifecycle
-import play.api.libs.concurrent.ActorSystemProvider.{ ApplicationShutdownReason, StopHook }
 import play.api.mvc.EssentialFilter
-import play.core.DefaultWebCommands
 
-import scala.collection.immutable
-import scala.concurrent.{ ExecutionContext, Future, Promise }
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+import scala.concurrent.Promise
 import scala.language.experimental.macros
 
 /**
@@ -41,24 +48,7 @@ import scala.language.experimental.macros
  * This class provides an abstraction over Play's application loader that provides Lagom specific functionality.
  */
 abstract class LagomApplicationLoader extends ApplicationLoader with ServiceDiscovery {
-
   val logger = Logger(classOf[LagomApplicationLoader])
-
-  if (logger.isWarnEnabled && describeService.isEmpty) {
-    describeServices match {
-      case Seq(_) => logger.warn(
-        s"${Logging.simpleName(this)}: overriding LagomApplicationLoader.describeServices is deprecated: " +
-          "override LagomApplicationLoader.describeService instead"
-      )
-      case Seq(_, _*) => logger.warn(
-        s"${Logging.simpleName(this)}: overriding LagomApplicationLoader.describeServices is deprecated: " +
-          "combine your Service interfaces or split them into multiple projects, " +
-          "and override LagomApplicationLoader.describeService instead"
-      )
-      // otherwise there are no services defined at all, which is OK
-      case _ => ()
-    }
-  }
 
   /**
    * Implementation of Play's load method.
@@ -69,7 +59,7 @@ abstract class LagomApplicationLoader extends ApplicationLoader with ServiceDisc
    *
    * It also wraps the Play specific types in Lagom types.
    */
-  override final def load(context: Context): Application = {
+  final override def load(context: Context): Application = {
     val environment = context.environment
     loadCustomLoggerConfiguration(environment)
     environment.mode match {
@@ -108,7 +98,7 @@ abstract class LagomApplicationLoader extends ApplicationLoader with ServiceDisc
   protected def readDescriptor[S <: Service]: Descriptor = macro ScaladslServerMacroImpl.readDescriptor[S]
 
   /**
-   * Implement this to allow tooling, such as ConductR, to discover the service (if any) offered by this application.
+   * Implement this to allow tooling, such as Lightbend Orchestration, to discover the service (if any) offered by this application.
    *
    * This will be used to generate configuration regarding ACLs and service name for production deployment.
    *
@@ -120,55 +110,41 @@ abstract class LagomApplicationLoader extends ApplicationLoader with ServiceDisc
    */
   def describeService: Option[Descriptor] = None
 
-  /**
-   * Deprecated: implement describeService instead. Multiple service interfaces should either be combined into a single
-   * service, or split into multiple service projects.
-   */
-  @deprecated("Binding multiple locatable ServiceDescriptors per Lagom service is unsupported. Override LagomApplicationLoader.describeService() instead", "1.3.3")
-  def describeServices: immutable.Seq[Descriptor] = describeService.to[immutable.Seq]
-
-  override final def discoverServices(classLoader: ClassLoader) = {
+  final override def discoverServices(classLoader: ClassLoader) = {
     import scala.collection.JavaConverters._
-    val descriptions = doDiscovery(classLoader)
-    if (descriptions.size > 1) {
-      logger.warn(s"Found ServiceDescriptions: ${descriptions.map(_.name()).mkString("[", ",", "]")}. Support for multiple locatable services will be removed.")
-    }
-    descriptions.asJava
+    doDiscovery(classLoader).asJava
   }
 
-  private final def doDiscovery(classLoader: ClassLoader) = {
+  private final def doDiscovery(classLoader: ClassLoader): Seq[ServiceDescription] = {
     import scala.collection.JavaConverters._
     import scala.compat.java8.OptionConverters._
 
     val serviceResolver = new ScaladslServiceResolver(DefaultExceptionSerializer.Unresolved)
-    describeServices.map { descriptor =>
+    describeService.map { descriptor =>
       val resolved = serviceResolver.resolve(descriptor)
       val convertedAcls = resolved.acls.map { acl =>
         new ServiceAcl {
-          override def method() = acl.method.map(_.name).asJava
+          override def method(): Optional[String] = acl.method.map(_.name).asJava
 
-          override def pathPattern() = acl.pathRegex.asJava
-        }.asInstanceOf[ServiceAcl]
+          override def pathPattern(): Optional[String] = acl.pathRegex.asJava
+        }
       }.asJava
       new ServiceDescription {
-        override def acls() = convertedAcls
+        override def acls(): util.List[ServiceAcl] = convertedAcls
 
-        override def name() = resolved.name
-      }.asInstanceOf[ServiceDescription]
-    }
+        override def name(): String = resolved.name
+      }
+    }.toSeq
   }
 
   /**
    * Fix for https://github.com/lagom/lagom/issues/534
-   *
-   * @param environment
    */
-  private def loadCustomLoggerConfiguration(environment: Environment) = {
+  private def loadCustomLoggerConfiguration(environment: Environment): Unit = {
     LoggerConfigurator(environment.classLoader).foreach {
       _.configure(environment)
     }
   }
-
 }
 
 /**
@@ -189,7 +165,7 @@ object LagomApplicationContext {
    * Create a Lagom application loader context.
    *
    * @param context The Play context to wrap.
-   * @return A Lagom applciation context.
+   * @return A Lagom application context.
    */
   def apply(context: Context): LagomApplicationContext = new LagomApplicationContext {
     override val playContext: Context = context
@@ -198,7 +174,14 @@ object LagomApplicationContext {
   /**
    * A test application loader context, useful when loading the application in unit or integration tests.
    */
-  val Test = apply(Context(Environment.simple(), None, new DefaultWebCommands, Configuration.empty, new DefaultApplicationLifecycle))
+  val Test = apply(
+    Context(
+      environment = Environment.simple(),
+      devContext = None,
+      initialConfiguration = Configuration.empty,
+      lifecycle = new DefaultApplicationLifecycle
+    )
+  )
 }
 
 /**
@@ -219,13 +202,13 @@ object LagomApplicationContext {
  * @param context The application context.
  */
 abstract class LagomApplication(context: LagomApplicationContext)
-  extends BuiltInComponentsFromContext(context.playContext)
-  with ProvidesAdditionalConfiguration
-  with ProvidesJsonSerializerRegistry
-  with LagomServerComponents
-  with LagomServiceClientComponents
-  with LagomConfigComponent {
-
+    extends BuiltInComponentsFromContext(context.playContext)
+    with ProvidesAdditionalConfiguration
+    with ProvidesJsonSerializerRegistry
+    with LagomServerComponents
+    with LagomServiceClientComponents
+    with LagomConfigComponent
+    with AkkaManagementComponents {
   override val httpFilters: Seq[EssentialFilter] = Nil
 
   @deprecated(message = "prefer `config` using typesafe Config instead", since = "1.4.0")
@@ -234,27 +217,23 @@ abstract class LagomApplication(context: LagomApplicationContext)
     Configuration.load(environment) ++ context.playContext.initialConfiguration ++ additionalConfig
   }
 
-  override lazy val actorSystem: ActorSystem = {
-    val (system, stopHook) = ActorSystemProvider.start(config, environment, optionalJsonSerializerRegistry)
-    applicationLifecycle.addStopHook(stopHook)
-    system
-  }
+  override lazy val actorSystem: ActorSystem =
+    ActorSystemProvider.start(config, environment, optionalJsonSerializerRegistry)
 
   LagomServerTopicFactoryVerifier.verify(lagomServer, topicPublisherName)
 }
 
 private object ActorSystemProvider {
-
   val logger = Logger(classOf[LagomApplication])
 
   /**
    * This is copied from Play's ActorSystemProvider, modified so we can inject json serializers
    */
   def start(
-    config:             Config,
-    environment:        Environment,
-    serializerRegistry: Option[JsonSerializerRegistry]
-  ): (ActorSystem, StopHook) = {
+      config: Config,
+      environment: Environment,
+      serializerRegistry: Option[JsonSerializerRegistry]
+  ): ActorSystem = {
     val serializationSetup =
       JsonSerializerRegistry.serializationSetupFor(serializerRegistry.getOrElse(EmptyJsonSerializerRegistry))
 
@@ -264,7 +243,6 @@ private object ActorSystemProvider {
       serializationSetup
     )
   }
-
 }
 
 /**
@@ -310,12 +288,13 @@ trait LocalServiceLocator extends RequiresLagomServicePort with CircuitBreakerCo
 
   lazy val serviceLocator: ServiceLocator =
     new CircuitBreakingServiceLocator(circuitBreakersPanel)(executionContext) {
-      val services = lagomServer.serviceBindings.map(_.descriptor.name).toSet
+      val serviceName: String = lagomServer.serviceBinding.descriptor.name
 
-      def getUri(name: String): Future[Option[URI]] = lagomServicePort.map {
-        case port if services(name) => Some(URI.create(s"http://localhost:$port"))
-        case _                      => None
-      }(executionContext)
+      def getUri(name: String): Future[Option[URI]] =
+        lagomServicePort.map {
+          case port if serviceName.equals(name) => Some(URI.create(s"http://localhost:$port"))
+          case _                                => None
+        }(executionContext)
 
       override def locate(name: String, serviceCall: Call[_, _]): Future[Option[URI]] =
         getUri(name)
@@ -326,21 +305,24 @@ trait LocalServiceLocator extends RequiresLagomServicePort with CircuitBreakerCo
  * Verifies that if there are any topics published by the Lagom server, that there is also a topic publisher.
  */
 private[lagom] object LagomServerTopicFactoryVerifier {
-
   def verify(lagomServer: LagomServer, topicPublisherName: Option[String]): Unit = {
     topicPublisherName match {
       case None =>
         // No topic publisher has been provided, make sure there are no topics to publish
-        lagomServer.serviceBindings.flatMap(_.descriptor.topics) match {
+        lagomServer.serviceBinding.descriptor.topics match {
           case Nil =>
           // No problemo
           case some =>
             // Uh oh
-            throw new NoTopicPublisherException("The bound Lagom server provides topics, but no topic publisher has been provided. " +
-              "This can be resolved by mixing in a topic publisher trait, such as " +
-              "com.lightbend.lagom.scaladsl.broker.kafka.LagomKafkaComponents or " +
-              "com.lightbend.lagom.scaladsl.testkit.TestTopicComponents into your application cake. " +
-              "The topics published are " + some.mkString(", "))
+            throw new NoTopicPublisherException(
+              s"""
+                 |The bound Lagom server provides topics, but no topic publisher has been provided.
+                 |This can be resolved by mixing in a topic publisher trait, such as
+                 |com.lightbend.lagom.scaladsl.broker.kafka.LagomKafkaComponents or
+                 |com.lightbend.lagom.scaladsl.testkit.TestTopicComponents into your application cake.
+                 |The topics published are: ${some.mkString(", ")}
+              """.stripMargin
+            )
         }
       case Some(_) =>
       // No need to do anything, a topic publisher has been provided
@@ -348,5 +330,4 @@ private[lagom] object LagomServerTopicFactoryVerifier {
   }
 
   class NoTopicPublisherException(msg: String) extends RuntimeException(msg)
-
 }

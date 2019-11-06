@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.javadsl.client;
 
 import akka.actor.ActorSystem;
@@ -25,9 +26,10 @@ public class CircuitBreakersPanelImpl implements CircuitBreakersPanel {
   private final CircuitBreakersPanelInternal circuitBreakersPanelInternal;
 
   @Inject()
-  public CircuitBreakersPanelImpl(ActorSystem system,
-                                  CircuitBreakerConfig config,
-                                  CircuitBreakerMetricsProvider metricsProvider) {
+  public CircuitBreakersPanelImpl(
+      ActorSystem system,
+      CircuitBreakerConfig config,
+      CircuitBreakerMetricsProvider metricsProvider) {
 
     this(new CircuitBreakersPanelInternal(system, config, metricsProvider));
   }
@@ -40,8 +42,7 @@ public class CircuitBreakersPanelImpl implements CircuitBreakersPanel {
   public <T> CompletionStage<T> withCircuitBreaker(String id, Supplier<CompletionStage<T>> body) {
 
     return FutureConverters.toJava(
-            circuitBreakersPanelInternal.withCircuitBreaker(id,
-                    (JFunction0<Future<T>>) () -> FutureConverters.toScala(body.get()))
-    );
+        circuitBreakersPanelInternal.withCircuitBreaker(
+            id, (JFunction0<Future<T>>) () -> FutureConverters.toScala(body.get())));
   }
 }

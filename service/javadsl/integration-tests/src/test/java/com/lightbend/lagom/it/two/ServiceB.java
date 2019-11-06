@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.it.two;
 
 import static com.lightbend.lagom.javadsl.api.Service.call;
@@ -12,11 +13,9 @@ import com.lightbend.lagom.javadsl.api.ServiceCall;
 
 public interface ServiceB extends Service {
 
-    ServiceCall<String, String> helloB();
+  ServiceCall<String, String> helloB();
 
-    default Descriptor descriptor() {
-        return named("serviceB").withCalls(
-            call(this::helloB)
-        );
-    }
+  default Descriptor descriptor() {
+    return named("serviceB").withCalls(call(this::helloB));
+  }
 }

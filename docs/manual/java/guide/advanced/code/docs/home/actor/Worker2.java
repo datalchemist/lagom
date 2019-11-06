@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.home.actor;
 
 import com.lightbend.lagom.javadsl.pubsub.TopicId;
@@ -8,7 +12,7 @@ import com.lightbend.lagom.javadsl.pubsub.PubSubRegistry;
 
 import akka.actor.AbstractActor;
 
-//#actor
+// #actor
 public class Worker2 extends AbstractActor {
 
   private final PubSubRef<JobStatus> topic;
@@ -20,11 +24,8 @@ public class Worker2 extends AbstractActor {
 
   @Override
   public Receive createReceive() {
-    return receiveBuilder()
-            .match(Job.class, this::perform)
-            .build();
+    return receiveBuilder().match(Job.class, this::perform).build();
   }
-
 
   private void perform(Job job) {
     sender().tell(JobAccepted.of(job.getJobId()), self());
@@ -33,6 +34,5 @@ public class Worker2 extends AbstractActor {
     topic.publish(JobStatus.of(job.getJobId(), "done"));
     context().stop(self());
   }
-
 }
-//#actor
+// #actor

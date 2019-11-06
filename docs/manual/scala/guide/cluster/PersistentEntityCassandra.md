@@ -1,6 +1,6 @@
-# Storing Persistent Entities in Cassandra
+# Storing Persistent Events in Cassandra
 
-This page describes how to configure Cassandra for use with Lagom's [[Persistent Entity|PersistentEntity]] API.
+This page describes how to configure Cassandra for use with [[Persistent Entity|PersistentEntity]] API or Akka Typed Persistence in a Lagom service .
 
 ## Project dependencies
 
@@ -68,10 +68,10 @@ lagom.persistence.read-side.cassandra {
 
 With these properties set to `false`, if the keyspaces or tables are missing at startup your service will log an error and fail to start.
 
-Lagom's Cassandra support is provided by the [`akka-persistence-cassandra`](https://github.com/akka/akka-persistence-cassandra) plugin. A full configuration reference can be in the plugin's [`reference.conf`](https://github.com/akka/akka-persistence-cassandra/blob/v0.20/src/main/resources/reference.conf).
+Lagom's Cassandra support is provided by the [`akka-persistence-cassandra`](https://doc.akka.io/docs/akka-persistence-cassandra/0.100/) plugin. A full configuration reference is available in the plugin's [`reference.conf`](https://github.com/akka/akka-persistence-cassandra/blob/v0.100/core/src/main/resources/reference.conf).
 
 ## Cassandra Location
 
 Lagom will start an embedded Cassandra server when running in developer mode. You can review the configuration options or how to disable the embedded server in the section on Cassandra Server in [[Running Lagom in development|CassandraServer]].
 
-In production you usually will prefer a dynamically locatable Cassandra server for resiliency. If you need to use a static list of contact-points to locate your Cassandra server review the section on deploying using static service location for Cassandra Service in [[Running Lagom in Production|ProductionOverview#Deploying-using-static-Cassandra-contact-points]].
+In production you usually will prefer a dynamically locatable Cassandra server for resiliency. If you need to use a static list of contact-points to locate your Cassandra server review the section on deploying using static service location for Cassandra Service in [[Running Lagom in Production|ProductionOverview#Using-static-Cassandra-contact-points]].

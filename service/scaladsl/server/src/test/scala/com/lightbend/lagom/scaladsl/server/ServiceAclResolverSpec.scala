@@ -1,30 +1,33 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.server
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.lightbend.lagom.internal.scaladsl.client.ScaladslServiceResolver
-import com.lightbend.lagom.scaladsl.api.{ Service, ServiceAcl, ServiceCall }
+import com.lightbend.lagom.scaladsl.api.Service
+import com.lightbend.lagom.scaladsl.api.ServiceAcl
+import com.lightbend.lagom.scaladsl.api.ServiceCall
 import com.lightbend.lagom.scaladsl.api.deser.DefaultExceptionSerializer
 import com.lightbend.lagom.scaladsl.api.transport.Method
-import org.scalatest.{ Matchers, WordSpec }
+import org.scalatest.Matchers
+import org.scalatest.WordSpec
 
 import scala.concurrent.Future
 
 class ServiceAclResolverSpec extends WordSpec with Matchers {
-
   class SomeService extends Service {
-    private def echo[A] = ServiceCall[A, A](Future.successful)
-    def callString: ServiceCall[String, String] = echo
-    def callStreamed: ServiceCall[Source[String, NotUsed], Source[String, NotUsed]] = echo
-    def callNotUsed: ServiceCall[NotUsed, NotUsed] = echo
-    def restCallString: ServiceCall[String, String] = echo
+    private def echo[A]                                                                 = ServiceCall[A, A](Future.successful)
+    def callString: ServiceCall[String, String]                                         = echo
+    def callStreamed: ServiceCall[Source[String, NotUsed], Source[String, NotUsed]]     = echo
+    def callNotUsed: ServiceCall[NotUsed, NotUsed]                                      = echo
+    def restCallString: ServiceCall[String, String]                                     = echo
     def restCallStreamed: ServiceCall[Source[String, NotUsed], Source[String, NotUsed]] = echo
-    def restCallNotUsed: ServiceCall[NotUsed, NotUsed] = echo
-    def withAutoAclTrue: ServiceCall[String, String] = echo
-    def withAutoAclFalse: ServiceCall[String, String] = echo
+    def restCallNotUsed: ServiceCall[NotUsed, NotUsed]                                  = echo
+    def withAutoAclTrue: ServiceCall[String, String]                                    = echo
+    def withAutoAclFalse: ServiceCall[String, String]                                   = echo
 
     override def descriptor = {
       import Service._
@@ -83,7 +86,6 @@ class ServiceAclResolverSpec extends WordSpec with Matchers {
       "generate the right number of acls" in {
         acls should have size 7
       }
-
     }
 
     "auto acl is false" should {
@@ -94,5 +96,4 @@ class ServiceAclResolverSpec extends WordSpec with Matchers {
       }
     }
   }
-
 }

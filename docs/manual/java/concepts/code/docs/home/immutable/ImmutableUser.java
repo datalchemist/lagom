@@ -1,6 +1,10 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.home.immutable;
 
-//#immutable
+// #immutable
 public class ImmutableUser {
   private final String name;
   private final String email;
@@ -17,6 +21,5 @@ public class ImmutableUser {
   public String getEmail() {
     return email;
   }
-
 }
-//#immutable
+// #immutable

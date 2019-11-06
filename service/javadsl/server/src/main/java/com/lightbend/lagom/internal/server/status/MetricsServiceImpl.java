@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.server.status;
 
 import com.codahale.metrics.Snapshot;
@@ -13,19 +14,19 @@ import com.lightbend.lagom.javadsl.api.transport.NotFound;
 import com.lightbend.lagom.javadsl.server.status.CircuitBreakerStatus;
 import com.lightbend.lagom.javadsl.server.status.Latency;
 import com.lightbend.lagom.javadsl.server.status.MetricsService;
+
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 import javax.inject.Inject;
-import scala.concurrent.duration.FiniteDuration;
 
 import akka.actor.ActorSystem;
 import akka.stream.javadsl.Source;
 
 public class MetricsServiceImpl implements MetricsService {
-  
+
   private final Optional<CircuitBreakerMetricsProviderImpl> provider;
 
   @Inject
@@ -35,27 +36,24 @@ public class MetricsServiceImpl implements MetricsService {
     boolean statusEnabled = system.settings().config().getBoolean("lagom.status-endpoint.enabled");
     if (statusEnabled && metricsProvider instanceof CircuitBreakerMetricsProviderImpl)
       provider = Optional.of((CircuitBreakerMetricsProviderImpl) metricsProvider);
-    else
-      provider = Optional.empty();
+    else provider = Optional.empty();
   }
 
   @Override
   public ServiceCall<NotUsed, List<CircuitBreakerStatus>> currentCircuitBreakers() {
     return request -> {
-      if (!provider.isPresent())
-        throw new NotFound("No metrics");
+      if (!provider.isPresent()) throw new NotFound("No metrics");
       return CompletableFuture.completedFuture(allCircuitBreakerStatus());
     };
   }
-  
+
   @Override
   public ServiceCall<NotUsed, Source<List<CircuitBreakerStatus>, ?>> circuitBreakers() {
     return request -> {
-      if (!provider.isPresent())
-        throw new NotFound("No metrics");
-      Source<List<CircuitBreakerStatus>, ?> source = 
-        Source.tick(FiniteDuration.create(100, TimeUnit.MILLISECONDS), FiniteDuration.create(2, TimeUnit.SECONDS), "tick")
-          .map(tick -> allCircuitBreakerStatus());
+      if (!provider.isPresent()) throw new NotFound("No metrics");
+      Source<List<CircuitBreakerStatus>, ?> source =
+          Source.tick(Duration.ofMillis(100), Duration.ofSeconds(2), "tick")
+              .map(tick -> allCircuitBreakerStatus());
       return CompletableFuture.completedFuture(source);
     };
   }
@@ -74,25 +72,25 @@ public class MetricsServiceImpl implements MetricsService {
 
   private CircuitBreakerStatus circuitBreakerStatus(CircuitBreakerMetricsImpl m) {
     Snapshot latencyHistogram = m.latency().getSnapshot();
-    Latency latency = Latency.builder()
-      .median(latencyHistogram.getMedian())
-      .percentile98th(latencyHistogram.get98thPercentile())
-      .percentile99th(latencyHistogram.get99thPercentile())
-      .percentile999th(latencyHistogram.get999thPercentile())
-      .min(latencyHistogram.getMin())
-      .max(latencyHistogram.getMax())
-      .mean(latencyHistogram.getMean())
-      .build();
+    Latency latency =
+        Latency.builder()
+            .median(latencyHistogram.getMedian())
+            .percentile98th(latencyHistogram.get98thPercentile())
+            .percentile99th(latencyHistogram.get99thPercentile())
+            .percentile999th(latencyHistogram.get999thPercentile())
+            .min(latencyHistogram.getMin())
+            .max(latencyHistogram.getMax())
+            .mean(latencyHistogram.getMean())
+            .build();
 
-    return CircuitBreakerStatus.builder().
-      id(m.breakerId())
-      .state(m.state().getValue())
-      .totalSuccessCount(m.successCount().getCount())
-      .totalFailureCount(m.failureCount().getCount())
-      .throughputOneMinute(m.throughput().getOneMinuteRate())
-      .failedThroughputOneMinute(m.failureThroughput().getOneMinuteRate())
-      .latencyMicros(latency)
-      .build();
+    return CircuitBreakerStatus.builder()
+        .id(m.breakerId())
+        .state(m.state().getValue())
+        .totalSuccessCount(m.successCount().getCount())
+        .totalFailureCount(m.failureCount().getCount())
+        .throughputOneMinute(m.throughput().getOneMinuteRate())
+        .failedThroughputOneMinute(m.failureThroughput().getOneMinuteRate())
+        .latencyMicros(latency)
+        .build();
   }
-
 }

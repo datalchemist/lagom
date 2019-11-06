@@ -1,29 +1,35 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.maven
 
 import java.io.File
 import java.util
 import java.util.Collections
-import javax.inject.{ Inject, Singleton }
+import javax.inject.Inject
+import javax.inject.Singleton
 
 import org.apache.maven.RepositoryUtils
 import org.apache.maven.artifact.ArtifactUtils
 import org.apache.maven.execution.MavenSession
 import org.apache.maven.lifecycle.internal._
 import org.apache.maven.model.Plugin
-import org.apache.maven.plugin.{ BuildPluginManager, MojoExecution }
+import org.apache.maven.plugin.BuildPluginManager
+import org.apache.maven.plugin.MojoExecution
 import org.apache.maven.project.MavenProject
 import org.codehaus.plexus.configuration.PlexusConfiguration
 import org.codehaus.plexus.util.StringUtils
 import org.codehaus.plexus.util.xml.Xpp3Dom
-import org.eclipse.aether.{ DefaultRepositorySystemSession, RepositorySystem }
+import org.eclipse.aether.DefaultRepositorySystemSession
+import org.eclipse.aether.RepositorySystem
 import org.eclipse.aether.artifact.Artifact
 import org.eclipse.aether.collection.CollectRequest
 import org.eclipse.aether.graph.Dependency
-import org.eclipse.aether.repository.{ WorkspaceReader, WorkspaceRepository }
-import org.eclipse.aether.resolution.{ DependencyRequest, DependencyResult }
+import org.eclipse.aether.repository.WorkspaceReader
+import org.eclipse.aether.repository.WorkspaceRepository
+import org.eclipse.aether.resolution.DependencyRequest
+import org.eclipse.aether.resolution.DependencyResult
 
 import scala.collection.JavaConverters._
 
@@ -33,10 +39,13 @@ import scala.collection.JavaConverters._
  * All the hairy stuff goes here.
  */
 @Singleton
-class MavenFacade @Inject() (repoSystem: RepositorySystem, session: MavenSession,
-                             buildPluginManager: BuildPluginManager, lifecycleExecutionPlanCalculator: LifecycleExecutionPlanCalculator,
-                             logger: MavenLoggerProxy) {
-
+class MavenFacade @Inject() (
+    repoSystem: RepositorySystem,
+    session: MavenSession,
+    buildPluginManager: BuildPluginManager,
+    lifecycleExecutionPlanCalculator: LifecycleExecutionPlanCalculator,
+    logger: MavenLoggerProxy
+) {
   /**
    * Resolve the classpath for the given artifact.
    *
@@ -66,7 +75,6 @@ class MavenFacade @Inject() (repoSystem: RepositorySystem, session: MavenSession
    * @return The resolved project.
    */
   def resolveProject(project: MavenProject, additionalDependencies: Seq[Dependency]): Seq[Dependency] = {
-
     // We use a low level API rather than just resolving the project so we can inject our own dev mode dependencies
     // The implementation of this is modelled off org.apache.maven.project.DefaultProjectDependenciesResolver
     val collect = new CollectRequest()
@@ -79,10 +87,10 @@ class MavenFacade @Inject() (repoSystem: RepositorySystem, session: MavenSession
     // Add project dependencies
     project.getDependencies.asScala.foreach { dep =>
       if (!(
-        StringUtils.isEmpty(dep.getGroupId) ||
-        StringUtils.isEmpty(dep.getArtifactId) ||
-        StringUtils.isEmpty(dep.getVersion)
-      )) {
+            StringUtils.isEmpty(dep.getGroupId) ||
+              StringUtils.isEmpty(dep.getArtifactId) ||
+              StringUtils.isEmpty(dep.getVersion)
+          )) {
         collect.addDependency(RepositoryUtils.toDependency(dep, stereotypes))
       }
     }
@@ -102,7 +110,12 @@ class MavenFacade @Inject() (repoSystem: RepositorySystem, session: MavenSession
     // The code below comes from org.apache.maven.project.DefaultProjectBuilder
     val artifacts = new util.LinkedHashSet[org.apache.maven.artifact.Artifact]
     if (depResult.getRoot != null) {
-      RepositoryUtils.toArtifacts(artifacts, depResult.getRoot.getChildren, Collections.singletonList(project.getArtifact.getId), null)
+      RepositoryUtils.toArtifacts(
+        artifacts,
+        depResult.getRoot.getChildren,
+        Collections.singletonList(project.getArtifact.getId),
+        null
+      )
       val lrm = session.getRepositorySession.getLocalRepositoryManager
       artifacts.asScala.foreach { artifact =>
         if (!artifact.isResolved) {
@@ -146,19 +159,18 @@ class MavenFacade @Inject() (repoSystem: RepositorySystem, session: MavenSession
   private def isService(project: MavenProject): Boolean = {
     // If the value is set, return it
     isLagomOrPlayService(project).getOrElse {
-
       // Otherwise try and run lagom:configure
       if (executeMavenPluginGoal(project, "configure")) {
-
         // Now try and get the value
         isLagomOrPlayService(project).getOrElse {
-
           // The value should have been set by lagom:configure, fail
           sys.error(s"${LagomKeys.LagomService} not set on project ${project.getArtifactId} after running configure!")
         }
       } else {
         // Lagom plugin not configured, return false
-        logger.debug(s"Project ${project.getArtifactId} is not a Lagom service because it doesn't have the Lagom plugin")
+        logger.debug(
+          s"Project ${project.getArtifactId} is not a Lagom service because it doesn't have the Lagom plugin"
+        )
         LagomKeys.LagomService.put(project, false)
         LagomKeys.PlayService.put(project, false)
         false
@@ -181,8 +193,8 @@ class MavenFacade @Inject() (repoSystem: RepositorySystem, session: MavenSession
   def executeMavenPluginGoal(project: MavenProject, name: String): Boolean = {
     getLagomPlugin(project) match {
       case Some(plugin) =>
-        val pluginDescriptor = buildPluginManager.loadPlugin(plugin, project.getRemotePluginRepositories,
-          session.getRepositorySession)
+        val pluginDescriptor =
+          buildPluginManager.loadPlugin(plugin, project.getRemotePluginRepositories, session.getRepositorySession)
 
         val mojoDescriptor = Option(pluginDescriptor.getMojo(name)).getOrElse {
           sys.error(s"Could not find goal $name on Lagom maven plugin")
@@ -204,8 +216,11 @@ class MavenFacade @Inject() (repoSystem: RepositorySystem, session: MavenSession
     projects.foreach { project =>
       switchProject(project) {
         // Calculate an execution plan
-        val executionPlan = lifecycleExecutionPlanCalculator.calculateExecutionPlan(session, project,
-          Collections.singletonList(new LifecycleTask(phase)))
+        val executionPlan = lifecycleExecutionPlanCalculator.calculateExecutionPlan(
+          session,
+          project,
+          Collections.singletonList(new LifecycleTask(phase))
+        )
 
         // Execute it
         executionPlan.asScala.foreach { mojoExecution =>
@@ -247,7 +262,6 @@ class MavenFacade @Inject() (repoSystem: RepositorySystem, session: MavenSession
   private def getLagomPlugin(project: MavenProject): Option[Plugin] = {
     Option(project.getPlugin("com.lightbend.lagom:lagom-maven-plugin"))
   }
-
 }
 
 /**
@@ -285,6 +299,6 @@ class UnbuiltWorkspaceReader(delegate: WorkspaceReader, session: MavenSession) e
 
   private def isTestArtifact(artifact: Artifact): Boolean = {
     ("test-jar" == artifact.getProperty("type", "")) ||
-      ("jar" == artifact.getExtension && "tests" == artifact.getClassifier)
+    ("jar" == artifact.getExtension && "tests" == artifact.getClassifier)
   }
 }

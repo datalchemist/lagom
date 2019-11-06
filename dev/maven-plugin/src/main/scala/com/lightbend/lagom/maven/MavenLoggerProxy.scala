@@ -1,10 +1,13 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.maven
 
-import javax.inject.{ Inject, Singleton }
+import javax.inject.Inject
+import javax.inject.Singleton
 
+import com.lightbend.lagom.dev.MiniLogger
 import org.codehaus.plexus.logging.Logger
 import play.dev.filewatch.LoggerProxy
 
@@ -12,7 +15,7 @@ import play.dev.filewatch.LoggerProxy
  * Logger
  */
 @Singleton
-class MavenLoggerProxy @Inject() (logger: Logger) extends LoggerProxy {
+class MavenLoggerProxy @Inject() (logger: Logger) extends LoggerProxy with MiniLogger {
   override def debug(message: => String): Unit = {
     if (logger.isDebugEnabled) {
       logger.debug(message)

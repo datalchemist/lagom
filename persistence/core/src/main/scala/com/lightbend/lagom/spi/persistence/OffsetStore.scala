@@ -1,10 +1,12 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.spi.persistence
 
 import akka.Done
-import akka.persistence.query.{ NoOffset, Offset }
+import akka.persistence.query.NoOffset
+import akka.persistence.query.Offset
 
 import scala.concurrent.Future
 import scala.collection.concurrent
@@ -13,7 +15,6 @@ import scala.collection.concurrent
  * Offset store implementation.
  */
 trait OffsetStore {
-
   /**
    * Prepare this offset store to process the given ID and tag.
    *
@@ -28,7 +29,6 @@ trait OffsetStore {
  * A prepared DAO for storing offsets.
  */
 trait OffsetDao {
-
   /**
    * The last offset processed.
    */

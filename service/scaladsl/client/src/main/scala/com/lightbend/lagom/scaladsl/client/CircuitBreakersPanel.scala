@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.client
 
 import scala.concurrent.Future
@@ -23,4 +24,3 @@ trait CircuitBreakersPanel {
    */
   def withCircuitBreaker[T](id: String)(body: => Future[T]): Future[T]
 }
-

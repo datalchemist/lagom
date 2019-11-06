@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.cassandra
 
 import java.io._
@@ -16,8 +17,7 @@ import akka.persistence.cassandra.testkit.{ CassandraLauncher => AkkaCassandraLa
  * Adapted from akka.persistence.cassandra.testkit.CassandraLauncher.
  */
 class CassandraLauncher {
-
-  private val ForcedShutdownTimeout = 20.seconds
+  private val ForcedShutdownTimeout              = 20.seconds
   private var cassandraDaemon: Option[Closeable] = None
 
   private val devEmbeddedYaml = "dev-embedded-cassandra.yaml"
@@ -29,15 +29,13 @@ class CassandraLauncher {
   def hostname = "127.0.0.1"
 
   def start(
-    cassandraDirectory: File,
-    yamlConfig:         File,
-    clean:              Boolean,
-    port:               Int,
-    jvmOptions:         Array[String]
+      cassandraDirectory: File,
+      yamlConfig: File,
+      clean: Boolean,
+      port: Int,
+      jvmOptions: Array[String]
   ): Unit = this.synchronized {
-
     if (cassandraDaemon.isEmpty) {
-
       prepareCassandraDirectory(cassandraDirectory, clean)
 
       val storagePort = AkkaCassandraLauncher.freePort()
@@ -59,7 +57,8 @@ class CassandraLauncher {
       // Extract the cassandra bundle to the directory
       val cassandraBundleFile = new File(cassandraDirectory, "cassandra-bundle.jar")
       if (!cassandraBundleFile.exists()) {
-        val is = this.getClass.getClassLoader.getResourceAsStream("akka/persistence/cassandra/launcher/cassandra-bundle.jar")
+        val is =
+          this.getClass.getClassLoader.getResourceAsStream("akka/persistence/cassandra/launcher/cassandra-bundle.jar")
         try {
           Files.copy(is, cassandraBundleFile.toPath)
         } finally {
@@ -88,12 +87,13 @@ class CassandraLauncher {
 
   private def startForked(configFile: File, cassandraBundle: File, port: Int, jvmOptions: Array[String]): Unit = {
     // Calculate classpath
-    val / = File.separator
-    val javaBin = s"${System.getProperty("java.home")}${/}bin${/}java"
+    val /         = File.separator
+    val javaBin   = s"${System.getProperty("java.home")}${/}bin${/}java"
     val className = "org.apache.cassandra.service.CassandraDaemon"
 
     val args = Seq(javaBin) ++ jvmOptions ++ Seq(
-      "-cp", cassandraBundle.getAbsolutePath,
+      "-cp",
+      cassandraBundle.getAbsolutePath,
       "-Dcassandra.config=file:" + configFile.getAbsoluteFile,
       "-Dcassandra-foreground=true",
       className

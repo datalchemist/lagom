@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.pubsub
 
 import java.util.Locale
@@ -13,11 +14,15 @@ import com.typesafe.config.ConfigFactory
 import akka.remote.testconductor.RoleName
 import akka.cluster.Cluster
 import akka.actor.ActorSystem
+import akka.actor.BootstrapSetup
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Source
 import akka.stream.testkit.scaladsl.TestSink
 
 import scala.concurrent.Await
+import com.lightbend.lagom.internal.cluster.STMultiNodeSpec
+import com.lightbend.lagom.scaladsl.playjson.JsonSerializerRegistry
+import com.typesafe.config.Config
 
 object ClusteredPubSubConfig extends MultiNodeConfig {
   val node1 = role("node1")
@@ -25,37 +30,45 @@ object ClusteredPubSubConfig extends MultiNodeConfig {
 
   commonConfig(ConfigFactory.parseString(s"""
     akka.loglevel = INFO
-    akka.actor.provider = "akka.cluster.ClusterActorRefProvider"
+    akka.actor.provider = "cluster"
     """))
-
 }
 
 class ClusteredPubSubSpecMultiJvmNode1 extends ClusteredPubSubSpec
 class ClusteredPubSubSpecMultiJvmNode2 extends ClusteredPubSubSpec
 
-class ClusteredPubSubSpec extends MultiNodeSpec(ClusteredPubSubConfig)
-  with STMultiNodeSpec with ImplicitSender {
+object ClusteredPubSubSpec {
+  def actorSystemCreator: Config => ActorSystem = { config =>
+    val bootstrapSetup     = BootstrapSetup(config)
+    val serializationSetup = JsonSerializerRegistry.serializationSetupFor(NotificationJsonSerializer)
 
+    ActorSystem(classOf[ClusteredPubSubSpec].getSimpleName, bootstrapSetup.and(serializationSetup))
+  }
+}
+
+class ClusteredPubSubSpec
+    extends MultiNodeSpec(ClusteredPubSubConfig, ClusteredPubSubSpec.actorSystemCreator)
+    with STMultiNodeSpec
+    with ImplicitSender {
   import ClusteredPubSubConfig._
 
-  override def initialParticipants = roles.size
+  override def initialParticipants: Int = roles.size
 
   def join(from: RoleName, to: RoleName): Unit = {
     runOn(from) {
-      Cluster(system) join node(to).address
+      Cluster(system).join(node(to).address)
     }
     enterBarrier(from.name + "-joined")
   }
 
-  override protected def atStartup() {
+  protected override def atStartup(): Unit = {
     roles.foreach(n => join(n, node1))
-
     enterBarrier("startup")
   }
 
   implicit val mat = ActorMaterializer()
-  val topic1 = TopicId[Notification]("1")
-  val topic2 = TopicId[Notification]("2")
+  val topic1       = TopicId[Notification]("1")
+  val topic2       = TopicId[Notification]("2")
 
   val application = new PubSubComponents {
     override def actorSystem: ActorSystem = system
@@ -64,16 +77,16 @@ class ClusteredPubSubSpec extends MultiNodeSpec(ClusteredPubSubConfig)
   val registry = application.pubSubRegistry
 
   "PubSub in a Cluster" must {
-
     "publish messages to subscriber on other node" in within(20.seconds) {
       val ref1 = registry.refFor(topic1)
 
       runOn(node2) {
-        val sub = ref1.subscriber
+        val sub   = ref1.subscriber
         val probe = sub.runWith(TestSink.probe[Notification]).request(10)
         enterBarrier("subscription-established-1")
 
-        probe.expectNext(Notification("msg-1"))
+        probe
+          .expectNext(Notification("msg-1"))
           .expectNext(Notification("msg-2"))
       }
 
@@ -93,19 +106,21 @@ class ClusteredPubSubSpec extends MultiNodeSpec(ClusteredPubSubConfig)
 
       runOn(node2) {
         val sub = ref2.subscriber
-        val probe = sub.map(_.msg.toUpperCase(Locale.ENGLISH)).runWith(TestSink.probe[String])
+        val probe = sub
+          .map(_.msg.toUpperCase(Locale.ENGLISH))
+          .runWith(TestSink.probe[String])
           .request(2)
         enterBarrier("subscription-established-2")
 
-        probe.expectNext("A")
+        probe
+          .expectNext("A")
           .expectNext("B")
-          .expectNoMsg(200.millis)
+          .expectNoMessage(200.millis)
           .request(2)
           .expectNext("C")
           .expectNext("D")
           .cancel()
-          .expectNoMsg(200.millis)
-
+          .expectNoMessage(200.millis)
       }
 
       runOn(node1) {
@@ -119,7 +134,5 @@ class ClusteredPubSubSpec extends MultiNodeSpec(ClusteredPubSubConfig)
 
       enterBarrier("after-2")
     }
-
   }
 }
-

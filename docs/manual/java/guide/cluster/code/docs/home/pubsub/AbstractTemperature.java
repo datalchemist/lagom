@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.home.pubsub;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
@@ -16,4 +20,3 @@ public interface AbstractTemperature extends Jsonable {
   @Value.Parameter
   TemeratureUnit getUnit();
 }
-

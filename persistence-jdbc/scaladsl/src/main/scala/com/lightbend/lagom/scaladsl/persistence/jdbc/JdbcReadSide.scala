@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.persistence.jdbc
 
 import java.sql.Connection
@@ -57,7 +58,9 @@ trait JdbcReadSide {
      * @tparam E The event class to handle.
      * @return This builder for fluent invocation
      */
-    def setEventHandler[E <: Event: ClassTag](handler: (Connection, EventStreamElement[E]) => Unit): ReadSideHandlerBuilder[Event]
+    def setEventHandler[E <: Event: ClassTag](
+        handler: (Connection, EventStreamElement[E]) => Unit
+    ): ReadSideHandlerBuilder[Event]
 
     /**
      * Build the read side handler.
@@ -66,5 +69,4 @@ trait JdbcReadSide {
      */
     def build(): ReadSideProcessor.ReadSideHandler[Event]
   }
-
 }

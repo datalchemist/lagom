@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.home.scaladsl.persistence
 
 //#imports
@@ -18,10 +22,8 @@ trait BlogServiceImpl {
   }
 
   //#service-impl
-  class BlogServiceImpl(
-    persistentEntities: PersistentEntityRegistry)(implicit ec: ExecutionContext)
-    extends BlogService {
-
+  class BlogServiceImpl(persistentEntities: PersistentEntityRegistry)(implicit ec: ExecutionContext)
+      extends BlogService {
     persistentEntities.register(new Post)
 
     override def addPost(id: String): ServiceCall[AddPost, String] =
@@ -34,10 +36,8 @@ trait BlogServiceImpl {
   }
   //#service-impl
 
-  class BlogServiceImpl2(
-    persistentEntities: PersistentEntityRegistry)(implicit ec: ExecutionContext)
-    extends BlogService {
-
+  class BlogServiceImpl2(persistentEntities: PersistentEntityRegistry)(implicit ec: ExecutionContext)
+      extends BlogService {
     persistentEntities.register(new Post)
 
     //#service-impl2
@@ -47,5 +47,4 @@ trait BlogServiceImpl {
     }
     //#service-impl2
   }
-
 }

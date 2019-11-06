@@ -21,7 +21,7 @@ To create your project, follow these steps:
 
 1. Enter the following command to invoke `sbt new` using the Lagom Giter8 template:
    ```
-   sbt -Dsbt.version=0.13.16 new https://github.com/lagom/lagom-java.g8
+   sbt new lagom/lagom-java.g8
    ```
 1. The sbt Lagom template prompts for the following parameters. Press `Enter` to accept the defaults or specify your own values:
 
@@ -68,8 +68,10 @@ It will take a bit of time to build the project and start the services. Among ot
 [info] Cassandra server running at 127.0.0.1:4000
 [info] Service locator is running at http://localhost:9008
 [info] Service gateway is running at http://localhost:9000
-[info] Service helloworld-impl listening for HTTP on 0:0:0:0:0:0:0:0:24266
-[info] Service hellostream-impl listening for HTTP on 0:0:0:0:0:0:0:0:26230
+[info] Service helloworld-impl listening for HTTP on 127.0.0.1:24266
+[info] Service helloworld-impl listening for HTTPS on 127.0.0.1:50695
+[info] Service hellostream-impl listening for HTTP on 127.0.0.1:26230
+[info] Service hellostream-impl listening for HTTPS on 127.0.0.1:58440
 (Services started, press enter to stop and go back to the console...)
 ```
 

@@ -1,12 +1,14 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.sbt
 
+import com.lightbend.lagom.dev.MiniLogger
 import play.dev.filewatch.LoggerProxy
 import sbt.Logger
 
-class SbtLoggerProxy(logger: Logger) extends LoggerProxy {
+class SbtLoggerProxy(logger: Logger) extends LoggerProxy with MiniLogger {
   override def debug(message: => String): Unit = logger.debug(message)
 
   override def info(message: => String): Unit = logger.info(message)

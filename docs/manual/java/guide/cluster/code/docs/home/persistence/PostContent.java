@@ -1,9 +1,13 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.home.persistence;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.lightbend.lagom.serialization.Jsonable;
 
-//#full-example
+// #full-example
 public final class PostContent implements Jsonable {
 
   private final String title;
@@ -32,7 +36,6 @@ public final class PostContent implements Jsonable {
 
     if (!title.equals(that.title)) return false;
     return body.equals(that.body);
-
   }
 
   @Override
@@ -42,4 +45,4 @@ public final class PostContent implements Jsonable {
     return result;
   }
 }
-//#full-example
+// #full-example

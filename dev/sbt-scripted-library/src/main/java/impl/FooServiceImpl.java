@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package impl;
 
 import akka.NotUsed;
@@ -7,8 +11,8 @@ import api.FooService;
 
 public class FooServiceImpl implements FooService {
 
-    @Override
-    public ServiceCall<NotUsed, NotUsed> foo() {
-        return request -> CompletableFuture.completedFuture(NotUsed.getInstance());
-    }
+  @Override
+  public ServiceCall<NotUsed, NotUsed> foo() {
+    return request -> CompletableFuture.completedFuture(NotUsed.getInstance());
+  }
 }

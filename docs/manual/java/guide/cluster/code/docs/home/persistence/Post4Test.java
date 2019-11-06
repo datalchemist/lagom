@@ -1,15 +1,18 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.home.persistence;
 
 import docs.home.persistence.BlogCommand.*;
 import docs.home.persistence.BlogEvent.*;
 
-//#unit-test
+// #unit-test
 import static org.junit.Assert.assertEquals;
 
-import com.google.inject.Guice;
-import com.google.inject.Injector;
+import play.inject.guice.GuiceInjectorBuilder;
+import play.inject.Injector;
 import com.lightbend.lagom.javadsl.persistence.PersistentEntity.InvalidCommandException;
-import com.lightbend.lagom.javadsl.cluster.testkit.ActorSystemModule;
 import com.lightbend.lagom.javadsl.testkit.PersistentEntityTestDriver;
 import com.lightbend.lagom.javadsl.testkit.PersistentEntityTestDriver.Outcome;
 import com.lightbend.lagom.javadsl.persistence.cassandra.testkit.TestUtil;
@@ -22,7 +25,12 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import akka.Done;
 import akka.actor.ActorSystem;
-import akka.testkit.JavaTestKit;
+import akka.testkit.javadsl.TestKit;
+import akka.stream.Materializer;
+
+import scala.concurrent.ExecutionContext;
+
+import static play.inject.Bindings.bind;
 
 public class Post4Test {
 
@@ -35,13 +43,19 @@ public class Post4Test {
 
   @AfterClass
   public static void teardown() {
-    JavaTestKit.shutdownActorSystem(system);
+    TestKit.shutdownActorSystem(system);
     system = null;
   }
 
-  private final Injector injector = Guice.createInjector(
-      new ActorSystemModule(system), new PubSubModule());
-  private final PubSubRegistry pubSub = injector.getInstance(PubSubRegistry.class);
+  private final Injector injector =
+      new GuiceInjectorBuilder()
+          .bindings(
+              bind(ActorSystem.class).toInstance(system),
+              bind(Materializer.class).toInstance(Materializer.matFromSystem(system)),
+              bind(ExecutionContext.class).toInstance(system.dispatcher()))
+          .bindings(new PubSubModule())
+          .build();
+  private final PubSubRegistry pubSub = injector.instanceOf(PubSubRegistry.class);
 
   @Test
   public void testAddPost() {
@@ -49,10 +63,8 @@ public class Post4Test {
         new PersistentEntityTestDriver<>(system, new Post4(pubSub), "post-1");
 
     PostContent content = new PostContent("Title", "Body");
-    Outcome<BlogEvent, BlogState> outcome = driver.run(
-        new AddPost(content));
-    assertEquals(new PostAdded("post-1", content),
-        outcome.events().get(0));
+    Outcome<BlogEvent, BlogState> outcome = driver.run(new AddPost(content));
+    assertEquals(new PostAdded("post-1", content), outcome.events().get(0));
     assertEquals(1, outcome.events().size());
     assertEquals(false, outcome.state().isPublished());
     assertEquals(Optional.of(content), outcome.state().getContent());
@@ -65,10 +77,8 @@ public class Post4Test {
     PersistentEntityTestDriver<BlogCommand, BlogEvent, BlogState> driver =
         new PersistentEntityTestDriver<>(system, new Post4(pubSub), "post-1");
 
-    Outcome<BlogEvent, BlogState> outcome = driver.run(
-        new AddPost(new PostContent("", "Body")));
-    assertEquals(InvalidCommandException.class,
-        outcome.getReplies().get(0).getClass());
+    Outcome<BlogEvent, BlogState> outcome = driver.run(new AddPost(new PostContent("", "Body")));
+    assertEquals(InvalidCommandException.class, outcome.getReplies().get(0).getClass());
     assertEquals(0, outcome.events().size());
     assertEquals(Collections.emptyList(), outcome.issues());
   }
@@ -80,9 +90,8 @@ public class Post4Test {
 
     driver.run(new AddPost(new PostContent("Title", "Body")));
 
-    Outcome<BlogEvent, BlogState> outcome = driver.run(
-      new ChangeBody("New body 1"),
-      new ChangeBody("New body 2"));
+    Outcome<BlogEvent, BlogState> outcome =
+        driver.run(new ChangeBody("New body 1"), new ChangeBody("New body 2"));
 
     assertEquals(new BodyChanged("post-1", "New body 1"), outcome.events().get(0));
     assertEquals(new BodyChanged("post-1", "New body 2"), outcome.events().get(1));
@@ -106,12 +115,10 @@ public class Post4Test {
 
     assertEquals(true, outcome.state().isPublished());
     assertEquals(1, outcome.events().size());
-    assertEquals(new PostPublished("post-1"),
-        outcome.events().get(0));
+    assertEquals(new PostPublished("post-1"), outcome.events().get(0));
     assertEquals(1, outcome.getReplies().size());
     assertEquals(Done.getInstance(), outcome.getReplies().get(0));
     assertEquals(Collections.emptyList(), outcome.issues());
   }
-
 }
-//#unit-test
+// #unit-test

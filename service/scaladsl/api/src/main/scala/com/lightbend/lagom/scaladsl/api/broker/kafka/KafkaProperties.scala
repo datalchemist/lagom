@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.api.broker.kafka
 
 import com.lightbend.lagom.scaladsl.api.Descriptor
@@ -9,7 +10,6 @@ import com.lightbend.lagom.scaladsl.api.Descriptor
  * Provides a set of Kafka specific properties that can be used when creating a topic descriptor.
  */
 object KafkaProperties {
-
   /**
    * A PartitionKeyStrategy produces a key for each message published to a Kafka topic.
    *

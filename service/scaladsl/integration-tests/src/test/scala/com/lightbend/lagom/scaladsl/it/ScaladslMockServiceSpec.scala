@@ -1,32 +1,47 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.it
 
 import akka.pattern.CircuitBreakerOpenException
 import akka.stream.Materializer
-import akka.stream.scaladsl.{ Flow, Sink, Source }
-import akka.{ Done, NotUsed }
+import akka.stream.scaladsl.Flow
+import akka.stream.scaladsl.Sink
+import akka.stream.scaladsl.Source
+import akka.Done
+import akka.NotUsed
+import akka.util.ByteString
 import com.lightbend.lagom.scaladsl.api.AdditionalConfiguration
-import com.lightbend.lagom.scaladsl.it.mocks.{ MockRequestEntity, MockResponseEntity, MockService, MockServiceImpl }
-import com.lightbend.lagom.scaladsl.server.{ LagomApplication, LagomApplicationContext, LagomServer, LocalServiceLocator }
+import com.lightbend.lagom.scaladsl.it.mocks.MockRequestEntity
+import com.lightbend.lagom.scaladsl.it.mocks.MockResponseEntity
+import com.lightbend.lagom.scaladsl.it.mocks.MockService
+import com.lightbend.lagom.scaladsl.it.mocks.MockServiceImpl
+import com.lightbend.lagom.scaladsl.server.LagomApplication
+import com.lightbend.lagom.scaladsl.server.LagomApplicationContext
+import com.lightbend.lagom.scaladsl.server.LagomServer
+import com.lightbend.lagom.scaladsl.server.LocalServiceLocator
 import com.lightbend.lagom.scaladsl.testkit.ServiceTest
-import org.scalatest.{ Matchers, WordSpec }
+import com.typesafe.config.ConfigFactory
+import org.scalatest.Matchers
+import org.scalatest.WordSpec
 import play.api.Configuration
 import play.api.libs.streams.AkkaStreams
 import play.api.libs.ws.ahc.AhcWSComponents
 
-import scala.concurrent.{ Await, Promise }
+import scala.concurrent.Await
+import scala.concurrent.Promise
 import scala.concurrent.duration._
-import scala.util.{ Failure, Success, Try }
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
 
 class ScaladslMockServiceSpec extends WordSpec with Matchers {
-
   List(AkkaHttp, Netty).foreach { implicit backend =>
     s"A mock service ($backend)" should {
       "be possible to invoke" in withServer { implicit mat => client =>
-        val id = 10L
-        val request = MockRequestEntity("bar", 20)
+        val id       = 10L
+        val request  = MockRequestEntity("bar", 20)
         val response = Await.result(client.mockCall(id).invoke(request), 10.seconds)
         response.incomingId should ===(id)
         response.incomingRequest should ===(request)
@@ -36,9 +51,13 @@ class ScaladslMockServiceSpec extends WordSpec with Matchers {
         Await.result(client.doNothing.invoke(), 10.seconds) should ===(NotUsed)
         MockService.invoked.get() should ===(true)
       }
-      "be possible to invoke for Done parameters and resonse" in withServer { implicit mat => client =>
+      "be possible to invoke for Done parameters and response" in withServer { implicit mat => client =>
         val response = Await.result(client.doneCall.invoke(Done), 10.seconds)
         response should ===(Done)
+      }
+      "be possible to invoke for ByteString parameters and response" in withServer { implicit mat => client =>
+        val request = ByteString.fromString("raw ByteString")
+        Await.result(client.echoByteString.invoke(request), 10.seconds) should ===(request)
       }
 
       "work with streamed responses" in withServer { implicit mat => client =>
@@ -47,7 +66,9 @@ class ScaladslMockServiceSpec extends WordSpec with Matchers {
           case Success(result) =>
             consume(result) should ===((1 to 3).map(i => MockResponseEntity(i, request)))
           case Failure(_) =>
-            println("SKIPPED - This may sometimes fail due to https://github.com/playframework/playframework/issues/5365")
+            println(
+              "SKIPPED - This may sometimes fail due to https://github.com/playframework/playframework/issues/5365"
+            )
         }
       }
 
@@ -56,10 +77,12 @@ class ScaladslMockServiceSpec extends WordSpec with Matchers {
         consume(resultStream) should ===((1 to 3).map(i => MockResponseEntity(i, new MockRequestEntity("entity", i))))
       }
       "work with streamed requests" in withServer { implicit mat => client =>
-        val requests = (1 to 3).map(i => new MockRequestEntity("request", i))
+        val requests    = (1 to 3).map(i => new MockRequestEntity("request", i))
         val gotResponse = Promise[None.type]()
-        val closeWhenGotResponse = Source.maybe[MockRequestEntity].mapMaterializedValue(_.completeWith(gotResponse.future))
-        val result = Await.result(client.streamRequest.invoke(Source(requests).concat(closeWhenGotResponse)), 10.seconds)
+        val closeWhenGotResponse =
+          Source.maybe[MockRequestEntity].mapMaterializedValue(_.completeWith(gotResponse.future))
+        val result =
+          Await.result(client.streamRequest.invoke(Source(requests).concat(closeWhenGotResponse)), 10.seconds)
         gotResponse.success(None)
         result should ===(MockResponseEntity(1, requests(0)))
       }
@@ -68,10 +91,13 @@ class ScaladslMockServiceSpec extends WordSpec with Matchers {
           // In this case, we wait for a response from the server before closing the connection. The response will be an
           // empty web socket message which will be returned to us as null
           MockService.firstReceived.set(null)
-          val requests = (1 to 3).map(i => new MockRequestEntity("request", i))
+          val requests    = (1 to 3).map(i => new MockRequestEntity("request", i))
           val gotResponse = Promise[None.type]()
-          val closeWhenGotResponse = Source.maybe[MockRequestEntity].mapMaterializedValue(_.completeWith(gotResponse.future))
-          Await.result(client.streamRequestUnit.invoke(Source(requests).concat(closeWhenGotResponse)), 10.seconds) should ===(NotUsed)
+          val closeWhenGotResponse =
+            Source.maybe[MockRequestEntity].mapMaterializedValue(_.completeWith(gotResponse.future))
+          Await.result(client.streamRequestUnit.invoke(Source(requests).concat(closeWhenGotResponse)), 10.seconds) should ===(
+            NotUsed
+          )
           gotResponse.success(None)
           MockService.firstReceived.get() should ===(requests(0))
         }
@@ -91,30 +117,39 @@ class ScaladslMockServiceSpec extends WordSpec with Matchers {
           consume(resultStream.take(3)) should ===(requests.map(r => MockResponseEntity(1, r)))
         }
         "the server closes the connection" in withServer { implicit mat => client =>
-          val requests = (1 to 3).map(i => new MockRequestEntity("request", i))
+          val requests    = (1 to 3).map(i => new MockRequestEntity("request", i))
           val gotResponse = Promise[None.type]()
-          val closeWhenGotResponse = Source.maybe[MockRequestEntity].mapMaterializedValue(_.completeWith(gotResponse.future))
+          val closeWhenGotResponse =
+            Source.maybe[MockRequestEntity].mapMaterializedValue(_.completeWith(gotResponse.future))
           val serverClosed = Promise[Done]()
-          val trackServerClosed = AkkaStreams.ignoreAfterCancellation[MockResponseEntity].mapMaterializedValue(serverClosed.completeWith)
-          val resultStream = Await.result(client.bidiStream.invoke(Source(requests).concat(closeWhenGotResponse)), 10.seconds)
-          consume(resultStream via trackServerClosed take 3) should ===(requests.map(r => MockResponseEntity(1, r)))
+          val trackServerClosed =
+            AkkaStreams.ignoreAfterCancellation[MockResponseEntity].mapMaterializedValue(serverClosed.completeWith)
+          val resultStream =
+            Await.result(client.bidiStream.invoke(Source(requests).concat(closeWhenGotResponse)), 10.seconds)
+          consume(resultStream.via(trackServerClosed).take(3)) should ===(requests.map(r => MockResponseEntity(1, r)))
           gotResponse.success(None)
           Await.result(serverClosed.future, 10.seconds) should ===(Done)
         }
       }
       "work with custom headers" in withServer { implicit mat => client =>
-        val (responseHeader, result) = Await.result(client.customHeaders
-          .handleRequestHeader(_.withHeader("Foo-Header", "Bar"))
-          .withResponseHeader
-          .invoke("Foo-Header"), 10.seconds)
+        val (responseHeader, result) = Await.result(
+          client.customHeaders
+            .handleRequestHeader(_.withHeader("Foo-Header", "Bar"))
+            .withResponseHeader
+            .invoke("Foo-Header"),
+          10.seconds
+        )
         result should ===("Bar")
         responseHeader.getHeader("Header-Name") should ===(Some("Foo-Header"))
         responseHeader.status should ===(201)
       }
       "work with custom headers on streams" in withServer { implicit mat => client =>
-        val result = Await.result(client.streamCustomHeaders
-          .handleRequestHeader(_.withHeaders(List("Header-1" -> "value1", "Header-2" -> "value2")))
-          .invoke(Source(List("Header-1", "Header-2")).concat(Source.maybe)), 10.seconds)
+        val result = Await.result(
+          client.streamCustomHeaders
+            .handleRequestHeader(_.withHeaders(List("Header-1" -> "value1", "Header-2" -> "value2")))
+            .invoke(Source(List("Header-1", "Header-2")).concat(Source.maybe)),
+          10.seconds
+        )
         val values = consume(result.via(Flow[String].take(2)))
         values should ===(Seq("value1", "value2"))
       }
@@ -122,8 +157,12 @@ class ScaladslMockServiceSpec extends WordSpec with Matchers {
         Await.result(client.serviceName.invoke(), 10.seconds) should ===("mockservice")
       }
       "send the service name on streams" in withServer { implicit mat => client =>
-        Await.result(Await.result(client.streamServiceName.invoke(), 10.seconds)
-          .runWith(Sink.head), 10.seconds) should ===("mockservice")
+        Await.result(
+          Await
+            .result(client.streamServiceName.invoke(), 10.seconds)
+            .runWith(Sink.head),
+          10.seconds
+        ) should ===("mockservice")
       }
 
       "work with query params" in withServer { implicit mat => client =>
@@ -134,7 +173,7 @@ class ScaladslMockServiceSpec extends WordSpec with Matchers {
       }
 
       "work with collections of entities" in withServer { implicit mat => client =>
-        val request = new MockRequestEntity("results", 10)
+        val request  = new MockRequestEntity("results", 10)
         val response = Await.result(client.listResults.invoke(request), 10.seconds)
 
         response.size should ===(request.field2)
@@ -142,16 +181,16 @@ class ScaladslMockServiceSpec extends WordSpec with Matchers {
 
       "work with custom serializers" when {
         "the serializer protocol uses a custom contentType" in withServer { implicit mat => client =>
-          val id = 20
-          val request = new MockRequestEntity("bar", id)
+          val id       = 20
+          val request  = new MockRequestEntity("bar", id)
           val response = Await.result(client.customContentType.invoke(request), 10.seconds)
           response.incomingId should ===(id)
           response.incomingRequest should ===(request)
         }
 
         "the serializer protocol does not specify a contentType" in withServer { implicit mat => client =>
-          val id = 20
-          val request = new MockRequestEntity("bar", id)
+          val id       = 20
+          val request  = new MockRequestEntity("bar", id)
           val response = Await.result(client.noContentType.invoke(request), 10.seconds)
           response.incomingId should ===(id)
           response.incomingRequest should ===(request)
@@ -172,7 +211,6 @@ class ScaladslMockServiceSpec extends WordSpec with Matchers {
         }
         MockService.invoked.get() should ===(false)
       }
-
     }
   }
 
@@ -181,19 +219,21 @@ class ScaladslMockServiceSpec extends WordSpec with Matchers {
   }
 
   private def withServer(block: Materializer => MockService => Unit)(implicit httpBackend: HttpBackend): Unit = {
-
     ServiceTest.withServer(ServiceTest.defaultSetup) { ctx =>
       new LagomApplication(LagomApplicationContext.Test) with AhcWSComponents with LocalServiceLocator {
         override lazy val lagomServer = serverFor[MockService](new MockServiceImpl)
 
-        override def additionalConfiguration: AdditionalConfiguration =
-          super.additionalConfiguration ++ Configuration.from(Map(
-            "play.server.provider" -> httpBackend.provider
-          ))
+        override def additionalConfiguration: AdditionalConfiguration = {
+          import scala.collection.JavaConverters._
+          super.additionalConfiguration ++ ConfigFactory.parseMap(
+            Map(
+              "play.server.provider" -> httpBackend.provider
+            ).asJava
+          )
+        }
       }
     } { server =>
       block(server.materializer)(server.serviceClient.implement[MockService])
     }
-
   }
 }

@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.javadsl.persistence.jdbc
 
 import akka.actor.ActorSystem
@@ -8,19 +9,23 @@ import akka.cluster.Cluster
 import com.lightbend.lagom.internal.javadsl.persistence.jdbc._
 import com.lightbend.lagom.internal.persistence.ReadSideConfig
 import com.lightbend.lagom.internal.persistence.jdbc.SlickDbTestProvider
-import com.lightbend.lagom.javadsl.persistence.jdbc.testkit.TestUtil
-import com.lightbend.lagom.persistence.{ ActorSystemSpec, PersistenceSpec }
-import com.typesafe.config.{ Config, ConfigFactory }
-import play.api.inject.{ ApplicationLifecycle, DefaultApplicationLifecycle }
-import play.api.{ Configuration, Environment }
+import com.lightbend.lagom.internal.persistence.testkit.AwaitPersistenceInit.awaitPersistenceInit
+import com.lightbend.lagom.persistence.ActorSystemSpec
+import com.lightbend.lagom.persistence.PersistenceSpec
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
+import play.api.inject.ApplicationLifecycle
+import play.api.inject.DefaultApplicationLifecycle
+import play.api.Configuration
+import play.api.Environment
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-abstract class JdbcPersistenceSpec(_system: ActorSystem) extends ActorSystemSpec(_system) {
-
-  def this(testName: String, config: Config) =
-    this(ActorSystem(testName, config.withFallback(TestUtil.clusterConfig()).withFallback(Configuration.load(Environment.simple()).underlying)))
+abstract class JdbcPersistenceSpec private (_system: ActorSystem) extends ActorSystemSpec(_system) {
+  def this(testName: String, config: Config) = {
+    this(ActorSystem(testName, config.withFallback(Configuration.load(Environment.simple()).underlying)))
+  }
 
   def this(config: Config) = this(PersistenceSpec.getCallerName(getClass), config)
 
@@ -29,16 +34,17 @@ abstract class JdbcPersistenceSpec(_system: ActorSystem) extends ActorSystemSpec
   import system.dispatcher
 
   protected lazy val slick = new SlickProvider(system)
-  protected lazy val session: JdbcSession = new JdbcSessionImpl(slick)
-  protected lazy val offsetStore = new JavadslJdbcOffsetStore(
-    slick,
-    system,
-    new OffsetTableConfiguration(
-      system.settings.config,
+
+  protected lazy val offsetStore =
+    new JavadslJdbcOffsetStore(
+      slick,
+      system,
+      new OffsetTableConfiguration(
+        system.settings.config,
+        ReadSideConfig()
+      ),
       ReadSideConfig()
-    ),
-    ReadSideConfig()
-  )
+    )
   protected lazy val jdbcReadSide: JdbcReadSide = new JdbcReadSideImpl(slick, offsetStore)
 
   private lazy val applicationLifecycle: ApplicationLifecycle = new DefaultApplicationLifecycle
@@ -56,12 +62,11 @@ abstract class JdbcPersistenceSpec(_system: ActorSystem) extends ActorSystemSpec
     // Trigger tables to be created
     Await.ready(slick.ensureTablesCreated(), 20.seconds)
 
-    TestUtil.awaitPersistenceInit(system)
+    awaitPersistenceInit(system)
   }
 
   override def afterAll(): Unit = {
-    applicationLifecycle.stop()
+    Await.ready(applicationLifecycle.stop(), 20.seconds)
     super.afterAll()
   }
-
 }

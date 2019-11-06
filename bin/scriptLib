@@ -1,4 +1,6 @@
-#! /bin/bash
+#!/usr/bin/env bash
+
+# Copyright (C) 2009-2019 Lightbend Inc. <https://www.lightbend.com>
 
 # Lib for CI scripts
 
@@ -9,11 +11,29 @@ set -o pipefail
 # CURRENT_BRANCH is used when updating Whitesource to determine the correct project name
 export CURRENT_BRANCH=${TRAVIS_BRANCH}
 
+EXTRA_OPTS=("-Dakka.test.timefactor=10")
+
+# Check if it is a scheduled build
+if [ "$TRAVIS_EVENT_TYPE" = "cron" ]; then
+    # `sort` is not necessary, but it is good to make it predictable.
+    AKKA_VERSION=$(curl -s https://repo.akka.io/snapshots/com/typesafe/akka/akka-actor_2.12/ | grep -oEi '2\.6-[0-9]{8}-[0-9]{6}' | sort | tail -n 1)
+
+    echo "Using Akka SNAPSHOT ${AKKA_VERSION}"
+
+    EXTRA_OPTS+=("-Dlagom.build.akka.version=${AKKA_VERSION}")
+fi
+
 runSbt() {
-  sbt --warn -jvm-opts .travis-jvmopts 'set concurrentRestrictions in Global += Tags.limitAll(1)' "$@"
+  sbt "${EXTRA_OPTS[@]}" --warn 'set concurrentRestrictions in Global += Tags.limitAll(1)' "$@"
 }
 
 runSbtNoisy() {
-  sbt -jvm-opts .travis-jvmopts 'set concurrentRestrictions in Global += Tags.limitAll(1)' "$@"
+  sbt "${EXTRA_OPTS[@]}" 'set concurrentRestrictions in Global += Tags.limitAll(1)' "$@"
 }
 
+
+printMessage() {
+  echo "[info]"
+  echo "[info] ---- $1"
+  echo "[info]"
+}

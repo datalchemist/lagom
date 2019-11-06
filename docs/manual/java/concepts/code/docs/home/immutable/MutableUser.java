@@ -1,6 +1,10 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.home.immutable;
 
-//#mutable
+// #mutable
 public class MutableUser {
   private String name;
   private String email;
@@ -20,6 +24,5 @@ public class MutableUser {
   public void setEmail(String email) {
     this.email = email;
   }
-
 }
-//#mutable
+// #mutable

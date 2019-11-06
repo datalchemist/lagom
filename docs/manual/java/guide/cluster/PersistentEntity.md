@@ -1,6 +1,6 @@
 # Persistent Entity
 
-[[Event Sourcing and CQRS|ES_CQRS]] is a recommended introduction to this section.
+We recommend reading [[Event Sourcing and CQRS|ES_CQRS]] as a prerequisite to this section.
 
 A `PersistentEntity` has a stable entity identifier, with which it can be accessed from the service implementation or other places. The state of an entity is persistent (durable) using [Event Sourcing](https://msdn.microsoft.com/en-us/library/jj591559.aspx). We represent all state changes as events and those immutable facts are appended to an event log. To recreate the current state of an entity when it is started we replay these events.
 
@@ -18,25 +18,9 @@ An entity is kept alive, holding its current state in memory, as long as it is u
 
 When an entity is started it replays the stored events to restore the current state. This can be either the full history of changes or starting from a snapshot which will reduce recovery times.
 
-## Choosing a database
-
-Lagom supports the following databases:
-
-* [Cassandra](https://cassandra.apache.org/)
-* [PostgreSQL](https://www.postgresql.org/)
-* [MySQL](https://www.mysql.com/)
-* [Oracle](https://www.oracle.com/database/index.html)
-* [H2](https://www.h2database.com/)
-
-We recommend using Cassandra. Cassandra is a very scalable distributed database, and it is also flexible enough to support typical use cases of reactive services. In contrast to most relational databases, it natively supports sharding and replication, and is emerging as an industry standard open source NoSQL database.
-
-Lagom also provides out of the box support for running Cassandra in a development environment - developers do not need to install, configure or manage Cassandra at all themselves when using Lagom, which makes for great developer velocity, and it means gone are the days where developers spend days setting up their development environment before they can start to be productive on a project.
-
-For instructions on configuring your project to use Cassandra, see [[Using Cassandra for Persistent Entities|PersistentEntityCassandra]]. If instead you want to use one of the relational databases listed above, see [[Using a Relational Database for Persistent Entities|PersistentEntityRDBMS]] on how to configure your project.
-
 ## PersistentEntity Stub
 
-This is how a [PersistentEntity](api/index.html?com/lightbend/lagom/javadsl/persistence/PersistentEntity.html) class looks like before filling in the implementation details:
+This is what a [PersistentEntity](api/index.html?com/lightbend/lagom/javadsl/persistence/PersistentEntity.html) class looks like before filling in the implementation details:
 
 @[post1](code/docs/home/persistence/Post1.java)
 
@@ -146,6 +130,7 @@ The state must be immutable to avoid concurrency issues that may occur from chan
 
 The section [[Immutable Objects|Immutable]] describes how to define immutable state classes.
 
+
 ## Usage from Service Implementation
 
 To access an entity from a service implementation you first need to inject the [PersistentEntityRegistry](api/index.html?com/lightbend/lagom/javadsl/persistence/PersistentEntityRegistry.html) and at startup (in the constructor) register the class that implements the `PersistentEntity`.
@@ -213,4 +198,26 @@ The default configuration should be good starting point, and the following setti
 
 ## Underlying Implementation
 
-Each `PersistentEntity` instance is executed by a [PersistentActor](https://doc.akka.io/docs/akka/2.5/persistence.html?language=java) that is managed by [Akka Cluster Sharding](https://doc.akka.io/docs/akka/2.5/cluster-sharding.html?language=java).
+Each `PersistentEntity` instance is executed by a [PersistentActor](https://doc.akka.io/docs/akka/2.6/persistence.html?language=java) that is managed by [Akka Cluster Sharding](https://doc.akka.io/docs/akka/2.6/cluster-sharding.html?language=java).
+
+## Execution details (advanced)
+
+If you've read all the sections above you are familiar with all the pieces conforming a Persistent Entity but there are few details worth explaining more extensively. As stated above:
+
+> Commands are processed sequentially, one at a time, for a specific entity instance.
+
+This needs a deeper explanation to understand the guarantees provided by Lagom. When a command is received, the following occurs:
+
+1. a command handler is selected, if none is found an `UnhandledCommandException` is thrown
+2. the command handler is invoked for the command, one or more events may be emitted (to process a command that emits no events, `setReadOnlyCommandHandler` must be used)
+3. events are applied to the appropriate event Handler (this can cause `Behavior` changes so defining the command handler on a behavior doesn't require all event handlers to be supported on that behavior)
+4. if applying the events didn't cause any exception, events are persisted atomically and in the same order they were emitted on the command handler
+5. if there's an `afterPersist`, then it is invoked (only once)
+6. if the snapshotting threshold is exceeded, a snapshot is generated and stored
+7. finally, the command processing completes and a new command may be processed.
+
+If you are familiar with [Akka Persistence](https://doc.akka.io/docs/akka/2.6/persistence.html) this process is slightly different in few places:
+
+* new commands are not processed until events are stored, the `Effect` completed and the snapshot updated (if necessary). Akka provides the same behavior and also `async` alternatives that cause new commands to be processed even before all event handlers have completed.
+* saving snapshots is an operation run under the covers _at least_ every `lagom.persistence.snapshot-after` events (see [Configuration](#Configuration) above) but "storing events atomically" takes precedence. Imagine we want a snapshot every 100 events and we already have 99 events, if the next command emits 3 events the snapshot will only be stored after event number 102 because events `[100, 101, 102]` will be stored atomically and only after it'll be possible to create a snapshot.
+

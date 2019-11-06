@@ -1,12 +1,22 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.persistence.cluster
 
 import akka.Done
+import akka.actor.Actor
+import akka.actor.ActorLogging
+import akka.actor.ActorRef
+import akka.actor.ActorSystem
+import akka.actor.PoisonPill
+import akka.actor.Props
 import akka.actor.Status.Failure
-import akka.actor.{ Actor, ActorLogging, ActorRef, ActorSystem, PoisonPill, Props, SupervisorStrategy }
-import akka.cluster.singleton.{ ClusterSingletonManager, ClusterSingletonManagerSettings, ClusterSingletonProxy, ClusterSingletonProxySettings }
+import akka.cluster.singleton.ClusterSingletonManager
+import akka.cluster.singleton.ClusterSingletonManagerSettings
+import akka.cluster.singleton.ClusterSingletonProxy
+import akka.cluster.singleton.ClusterSingletonProxySettings
+import akka.pattern.BackoffOpts
 import akka.pattern.BackoffSupervisor
 import akka.util.Timeout
 
@@ -25,26 +35,28 @@ import scala.concurrent.duration.FiniteDuration
  * If the task fails, it will be re-executed using exponential backoff using the given backoff parameters.
  */
 object ClusterStartupTask {
-
   def apply(
-    system:              ActorSystem,
-    taskName:            String,
-    task:                () => Future[Done],
-    taskTimeout:         FiniteDuration,
-    role:                Option[String],
-    minBackoff:          FiniteDuration,
-    maxBackoff:          FiniteDuration,
-    randomBackoffFactor: Double
+      system: ActorSystem,
+      taskName: String,
+      task: () => Future[Done],
+      taskTimeout: FiniteDuration,
+      role: Option[String],
+      minBackoff: FiniteDuration,
+      maxBackoff: FiniteDuration,
+      randomBackoffFactor: Double
   ): ClusterStartupTask = {
-
     val startupTaskProps = Props(classOf[ClusterStartupTaskActor], task, taskTimeout)
 
-    val backoffProps = BackoffSupervisor.propsWithSupervisorStrategy(
-      startupTaskProps, taskName, minBackoff, maxBackoff, randomBackoffFactor, SupervisorStrategy.stoppingStrategy
-    )
+    val backoffProps = BackoffOpts
+      .onStop(startupTaskProps, taskName, minBackoff, maxBackoff, randomBackoffFactor)
+      .withDefaultStoppingStrategy
 
-    val singletonProps = ClusterSingletonManager.props(backoffProps, PoisonPill,
-      ClusterSingletonManagerSettings(system))
+    val singletonProps =
+      ClusterSingletonManager.props(
+        BackoffSupervisor.props(backoffProps),
+        PoisonPill,
+        ClusterSingletonManagerSettings(system)
+      )
 
     val singleton = system.actorOf(singletonProps, s"$taskName-singleton")
 
@@ -52,7 +64,8 @@ object ClusterStartupTask {
       ClusterSingletonProxy.props(
         singletonManagerPath = singleton.path.toStringWithoutAddress,
         settings = ClusterSingletonProxySettings(system).withRole(role)
-      ), s"$taskName-singletonProxy"
+      ),
+      s"$taskName-singletonProxy"
     )
 
     new ClusterStartupTask(singletonProxy)
@@ -60,7 +73,6 @@ object ClusterStartupTask {
 }
 
 class ClusterStartupTask(actorRef: ActorRef) {
-
   import ClusterStartupTaskActor._
 
   /**
@@ -86,47 +98,44 @@ class ClusterStartupTask(actorRef: ActorRef) {
 }
 
 private[lagom] object ClusterStartupTaskActor {
-
   case object Execute
-
 }
 
-private[lagom] class ClusterStartupTaskActor(task: () => Future[Done], timeout: FiniteDuration) extends Actor with ActorLogging {
-
+private[lagom] class ClusterStartupTaskActor(task: () => Future[Done], timeout: FiniteDuration)
+    extends Actor
+    with ActorLogging {
   import ClusterStartupTaskActor._
-
   import akka.pattern.ask
   import akka.pattern.pipe
-
   import context.dispatcher
 
   override def preStart(): Unit = {
     // We let the ask pattern handle the timeout, by asking ourselves to execute the task and piping the result back to
     // ourselves
     implicit val askTimeout = Timeout(timeout)
-    self ? Execute pipeTo self
+    (self ? Execute).pipeTo(self)
   }
 
   def receive = {
     case Execute =>
       log.info(s"Executing cluster start task ${self.path.name}.")
-      task() pipeTo self
-      context become executing(List(sender()))
+      task().pipeTo(self)
+      context.become(executing(List(sender())))
   }
 
   def executing(outstandingRequests: List[ActorRef]): Receive = {
     case Execute =>
-      context become executing(sender() :: outstandingRequests)
+      context.become(executing(sender() :: outstandingRequests))
 
     case Done =>
       log.info(s"Cluster start task ${self.path.name} done.")
-      outstandingRequests foreach { requester =>
+      outstandingRequests.foreach { requester =>
         requester ! Done
       }
-      context become executed
+      context.become(executed)
 
     case failure @ Failure(e) =>
-      outstandingRequests foreach { requester =>
+      outstandingRequests.foreach { requester =>
         requester ! failure
       }
       // If we failed to prepare, crash
@@ -140,5 +149,4 @@ private[lagom] class ClusterStartupTaskActor(task: () => Future[Done], timeout: 
     case Done =>
     // We do expect to receive Done once executed since we initially asked ourselves to execute
   }
-
 }

@@ -1,13 +1,18 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.api
 
 import akka.NotUsed
 import akka.util.ByteString
 import com.lightbend.lagom.scaladsl.api.broker.Topic.TopicId
-import com.lightbend.lagom.scaladsl.api.deser.{ DefaultExceptionSerializer, ExceptionSerializer, MessageSerializer }
-import com.lightbend.lagom.scaladsl.api.transport.{ HeaderFilter, Method, UserAgentHeaderFilter }
+import com.lightbend.lagom.scaladsl.api.deser.DefaultExceptionSerializer
+import com.lightbend.lagom.scaladsl.api.deser.ExceptionSerializer
+import com.lightbend.lagom.scaladsl.api.deser.MessageSerializer
+import com.lightbend.lagom.scaladsl.api.transport.HeaderFilter
+import com.lightbend.lagom.scaladsl.api.transport.Method
+import com.lightbend.lagom.scaladsl.api.transport.UserAgentHeaderFilter
 
 import scala.collection.immutable
 import scala.reflect.ClassTag
@@ -87,7 +92,6 @@ sealed trait Descriptor {
 }
 
 object Descriptor {
-
   def apply(name: String): Descriptor = {
     DescriptorImpl(name)
   }
@@ -96,7 +100,6 @@ object Descriptor {
    * Describes a service call.
    */
   sealed trait Call[Request, Response] {
-
     /**
      * The id of the call.
      *
@@ -167,8 +170,14 @@ object Descriptor {
     def withAutoAcl(autoAcl: Boolean): Call[Request, Response]
   }
 
-  val NoCall: Call[NotUsed, NotUsed] = CallImpl(NamedCallId("NONE"), new ServiceCallHolder {},
-    MessageSerializer.NotUsedMessageSerializer, MessageSerializer.NotUsedMessageSerializer, None, None)
+  val NoCall: Call[NotUsed, NotUsed] = CallImpl(
+    NamedCallId("NONE"),
+    new ServiceCallHolder {},
+    MessageSerializer.NotUsedMessageSerializer,
+    MessageSerializer.NotUsedMessageSerializer,
+    None,
+    None
+  )
 
   /**
    * A call identifier.
@@ -182,7 +191,6 @@ object Descriptor {
    * A named call identifier.
    */
   sealed trait NamedCallId extends CallId {
-
     /**
      * The name of the call.
      */
@@ -190,7 +198,6 @@ object Descriptor {
   }
 
   object NamedCallId {
-
     /**
      * Create a named call identifier with the given name.
      */
@@ -201,7 +208,6 @@ object Descriptor {
    * A path based call identifier.
    */
   sealed trait PathCallId extends CallId {
-
     /**
      * The pattern for path.
      */
@@ -209,7 +215,6 @@ object Descriptor {
   }
 
   object PathCallId {
-
     /**
      * Create a path based call identifier with the given path pattern.
      */
@@ -220,7 +225,6 @@ object Descriptor {
    * A REST/HTTP call identifier.
    */
   sealed trait RestCallId extends CallId {
-
     /**
      * The HTTP method for the call.
      *
@@ -236,7 +240,6 @@ object Descriptor {
   }
 
   object RestCallId {
-
     /**
      * Create a REST call identifier with the given method and path pattern.
      */
@@ -255,9 +258,8 @@ object Descriptor {
    * Describes a message broker topic.
    */
   sealed trait TopicCall[Message] {
-
     /**
-     * The identifier for teh topic.
+     * The identifier for the topic.
      */
     val topicId: TopicId
 
@@ -336,50 +338,55 @@ object Descriptor {
   }
 
   private[api] case class DescriptorImpl(
-    name:                String,
-    calls:               immutable.Seq[Call[_, _]]   = Nil,
-    topics:              immutable.Seq[TopicCall[_]] = Nil,
-    exceptionSerializer: ExceptionSerializer         = DefaultExceptionSerializer.Unresolved,
-    autoAcl:             Boolean                     = false,
-    acls:                immutable.Seq[ServiceAcl]   = Nil,
-    headerFilter:        HeaderFilter                = UserAgentHeaderFilter,
-    locatableService:    Boolean                     = true,
-    circuitBreaker:      CircuitBreaker              = CircuitBreaker.PerNode
+      name: String,
+      calls: immutable.Seq[Call[_, _]] = Nil,
+      topics: immutable.Seq[TopicCall[_]] = Nil,
+      exceptionSerializer: ExceptionSerializer = DefaultExceptionSerializer.Unresolved,
+      autoAcl: Boolean = false,
+      acls: immutable.Seq[ServiceAcl] = Nil,
+      headerFilter: HeaderFilter = UserAgentHeaderFilter,
+      locatableService: Boolean = true,
+      circuitBreaker: CircuitBreaker = CircuitBreaker.PerNode
   ) extends Descriptor {
-    override def withCalls(calls: Call[_, _]*): Descriptor = copy(calls = calls.to[immutable.Seq])
-    override def withTopics(topics: TopicCall[_]*): Descriptor = copy(topics = topics.to[immutable.Seq])
-    override def withExceptionSerializer(exceptionSerializer: ExceptionSerializer): Descriptor = copy(exceptionSerializer = exceptionSerializer)
-    override def withAutoAcl(autoAcl: Boolean): Descriptor = copy(autoAcl = autoAcl)
-    override def withAcls(acls: ServiceAcl*): Descriptor = copy(acls = acls.to[immutable.Seq])
-    override def withHeaderFilter(headerFilter: HeaderFilter): Descriptor = copy(headerFilter = headerFilter)
-    override def withLocatableService(locatableService: Boolean): Descriptor = copy(locatableService = locatableService)
+    override def withCalls(calls: Call[_, _]*): Descriptor     = copy(calls = calls.toIndexedSeq)
+    override def withTopics(topics: TopicCall[_]*): Descriptor = copy(topics = topics.toIndexedSeq)
+    override def withExceptionSerializer(exceptionSerializer: ExceptionSerializer): Descriptor =
+      copy(exceptionSerializer = exceptionSerializer)
+    override def withAutoAcl(autoAcl: Boolean): Descriptor                      = copy(autoAcl = autoAcl)
+    override def withAcls(acls: ServiceAcl*): Descriptor                        = copy(acls = acls.toIndexedSeq)
+    override def withHeaderFilter(headerFilter: HeaderFilter): Descriptor       = copy(headerFilter = headerFilter)
+    override def withLocatableService(locatableService: Boolean): Descriptor    = copy(locatableService = locatableService)
     override def withCircuitBreaker(circuitBreaker: CircuitBreaker): Descriptor = copy(circuitBreaker = circuitBreaker)
   }
 
   private[api] case class CallImpl[Request, Response](
-    callId:             CallId,
-    serviceCallHolder:  ServiceCallHolder,
-    requestSerializer:  MessageSerializer[Request, _],
-    responseSerializer: MessageSerializer[Response, _],
-    circuitBreaker:     Option[CircuitBreaker]         = None,
-    autoAcl:            Option[Boolean]                = None
+      callId: CallId,
+      serviceCallHolder: ServiceCallHolder,
+      requestSerializer: MessageSerializer[Request, _],
+      responseSerializer: MessageSerializer[Response, _],
+      circuitBreaker: Option[CircuitBreaker] = None,
+      autoAcl: Option[Boolean] = None
   ) extends Call[Request, Response] {
-    override def withServiceCallHolder(serviceCallHolder: ServiceCallHolder): Call[Request, Response] = copy(serviceCallHolder = serviceCallHolder)
-    override def withRequestSerializer(requestSerializer: MessageSerializer[Request, _]): Call[Request, Response] = copy(requestSerializer = requestSerializer)
-    override def withResponseSerializer(responseSerializer: MessageSerializer[Response, _]): Call[Request, Response] = copy(responseSerializer = responseSerializer)
-    override def withCircuitBreaker(circuitBreaker: CircuitBreaker): Call[Request, Response] = copy(circuitBreaker = Some(circuitBreaker))
+    override def withServiceCallHolder(serviceCallHolder: ServiceCallHolder): Call[Request, Response] =
+      copy(serviceCallHolder = serviceCallHolder)
+    override def withRequestSerializer(requestSerializer: MessageSerializer[Request, _]): Call[Request, Response] =
+      copy(requestSerializer = requestSerializer)
+    override def withResponseSerializer(responseSerializer: MessageSerializer[Response, _]): Call[Request, Response] =
+      copy(responseSerializer = responseSerializer)
+    override def withCircuitBreaker(circuitBreaker: CircuitBreaker): Call[Request, Response] =
+      copy(circuitBreaker = Some(circuitBreaker))
     override def withAutoAcl(autoAcl: Boolean): Call[Request, Response] = copy(autoAcl = Some(autoAcl))
   }
 
-  private[api] case class NamedCallIdImpl(name: String) extends NamedCallId
-  private[api] case class PathCallIdImpl(pathPattern: String) extends PathCallId
+  private[api] case class NamedCallIdImpl(name: String)                       extends NamedCallId
+  private[api] case class PathCallIdImpl(pathPattern: String)                 extends PathCallId
   private[api] case class RestCallIdImpl(method: Method, pathPattern: String) extends RestCallId
 
   private[api] case class TopicCallImpl[Message](
-    topicId:           TopicId,
-    topicHolder:       TopicHolder,
-    messageSerializer: MessageSerializer[Message, ByteString],
-    properties:        Properties[Message]                    = Properties.empty[Message]
+      topicId: TopicId,
+      topicHolder: TopicHolder,
+      messageSerializer: MessageSerializer[Message, ByteString],
+      properties: Properties[Message] = Properties.empty[Message]
   ) extends TopicCall[Message] {
     override def withTopicHolder(topicHolder: TopicHolder): TopicCall[Message] = copy(topicHolder = topicHolder)
     override def addProperty[T](property: Property[Message, T], value: T): TopicCall[Message] =
@@ -389,7 +396,8 @@ object Descriptor {
   private case class PropertyImpl[Message, T](valueClass: Class[T], name: String) extends Property[Message, T]
   private case class PropertiesImpl[Message](properties: Map[Property[Message, _], _]) extends Properties[Message] {
     override def get[T](property: Property[Message, T]): Option[T] = properties.get(property).asInstanceOf[Option[T]]
-    override def +[T](propertyValue: (Property[Message, T], T)): Properties[Message] = PropertiesImpl(properties + propertyValue)
+    override def +[T](propertyValue: (Property[Message, T], T)): Properties[Message] =
+      PropertiesImpl(properties + propertyValue)
   }
 }
 
@@ -399,9 +407,10 @@ sealed trait ServiceAcl {
 }
 
 object ServiceAcl {
-  def apply(method: Option[Method] = None, pathRegex: Option[String] = None): ServiceAcl = ServiceAclImpl(method, pathRegex)
+  def apply(method: Option[Method] = None, pathRegex: Option[String] = None): ServiceAcl =
+    ServiceAclImpl(method, pathRegex)
 
-  def forPathRegex(pathRegex: String) = apply(None, Some(pathRegex))
+  def forPathRegex(pathRegex: String)                          = apply(None, Some(pathRegex))
   def forMethodAndPathRegex(method: Method, pathRegex: String) = apply(Some(method), Some(pathRegex))
 
   private case class ServiceAclImpl(method: Option[Method], pathRegex: Option[String]) extends ServiceAcl
@@ -410,8 +419,8 @@ object ServiceAcl {
 sealed trait CircuitBreaker
 
 object CircuitBreaker {
-  case object None extends CircuitBreaker
-  case object PerNode extends CircuitBreaker
+  case object None       extends CircuitBreaker
+  case object PerNode    extends CircuitBreaker
   case object PerService extends CircuitBreaker
 
   sealed trait CircuitBreakerId extends CircuitBreaker {

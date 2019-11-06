@@ -1,7 +1,10 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.scaladsl.services
 
 package helloservice {
-
   //#hello-service
   import com.lightbend.lagom.scaladsl.api._
 
@@ -19,7 +22,6 @@ package helloservice {
 }
 
 package servicecall {
-
   import scala.concurrent.Future
 
   //#service-call
@@ -30,7 +32,6 @@ package servicecall {
 }
 
 package callidname {
-
   import com.lightbend.lagom.scaladsl.api._
 
   trait HelloService extends Service {
@@ -105,7 +106,6 @@ package callquerystringparameters {
 }
 
 package callrest {
-
   import akka.NotUsed
   import com.lightbend.lagom.scaladsl.api._
 
@@ -120,8 +120,8 @@ package callrest {
       import Service._
       import com.lightbend.lagom.scaladsl.api.transport.Method
       named("orders").withCalls(
-        restCall(Method.POST,   "/order/:orderId/item",         addItem _),
-        restCall(Method.GET,    "/order/:orderId/item/:itemId", getItem _),
+        restCall(Method.POST, "/order/:orderId/item", addItem _),
+        restCall(Method.GET, "/order/:orderId/item/:itemId", getItem _),
         restCall(Method.DELETE, "/order/:orderId/item/:itemId", deleteItem _)
       )
     }
@@ -167,16 +167,14 @@ package hellostream {
     }
     //#hello-stream
   }
-
 }
 
 package jsonmessages {
-
   //#user-class
   case class User(
-    id: Long,
-    name: String,
-    email: Option[String]
+      id: Long,
+      name: String,
+      email: Option[String]
   )
   //#user-class
 
@@ -186,5 +184,4 @@ package jsonmessages {
     implicit val format: Format[User] = Json.format[User]
   }
   //#user-format
-
 }

@@ -1,14 +1,16 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.api.deser
+
+import scala.language.higherKinds
 
 import java.util.UUID
 
-import scala.collection.generic.CanBuildFrom
+import scala.collection.compat._
 import scala.collection.immutable
 import scala.collection.immutable.Seq
-import scala.language.higherKinds
 
 /**
  * A path param serializer is responsible for serializing and deserializing parameters that are extracted from and
@@ -35,11 +37,12 @@ trait PathParamSerializer[Param] {
 object PathParamSerializer extends DefaultPathParamSerializers
 
 trait DefaultPathParamSerializers extends LowPriorityPathParamSerializers {
-
   /**
    * Create a PathParamSerializer for required parameters.
    */
-  def required[Param](name: String)(deserializeFunction: String => Param)(serializeFunction: Param => String): PathParamSerializer[Param] = new NamedPathParamSerializer[Param](name) {
+  def required[Param](name: String)(
+      deserializeFunction: String => Param
+  )(serializeFunction: Param => String): PathParamSerializer[Param] = new NamedPathParamSerializer[Param](name) {
     def serialize(parameter: Param): immutable.Seq[String] = immutable.Seq(serializeFunction(parameter))
 
     def deserialize(parameters: immutable.Seq[String]): Param = parameters.headOption match {
@@ -81,8 +84,9 @@ trait DefaultPathParamSerializers extends LowPriorityPathParamSerializers {
   /**
    * An option path param serializer
    */
-  implicit def optionPathParamSerializer[Param](implicit delegate: PathParamSerializer[Param]): PathParamSerializer[Option[Param]] = {
-
+  implicit def optionPathParamSerializer[Param](
+      implicit delegate: PathParamSerializer[Param]
+  ): PathParamSerializer[Option[Param]] = {
     val name = delegate match {
       case named: NamedPathParamSerializer[_] => s"Option[${named.name}]"
       case other                              => s"Option($other)"
@@ -103,7 +107,6 @@ trait DefaultPathParamSerializers extends LowPriorityPathParamSerializers {
 }
 
 trait LowPriorityPathParamSerializers {
-
   sealed abstract class NamedPathParamSerializer[Param](val name: String) extends PathParamSerializer[Param] {
     override def toString: String = "PathParamSerializer(" + name + ")"
   }
@@ -111,20 +114,19 @@ trait LowPriorityPathParamSerializers {
   /**
    * A traversable path param serializer
    */
-  implicit def traversablePathParamSerializer[CC[X] <: Traversable[X], Param: PathParamSerializer](implicit delegate: PathParamSerializer[Param], bf: CanBuildFrom[CC[_], Param, CC[Param]]): PathParamSerializer[CC[Param]] = {
-
+  implicit def traversablePathParamSerializer[CC[X] <: Traversable[X], Param: PathParamSerializer](
+      implicit delegate: PathParamSerializer[Param],
+      bf: Factory[Param, CC[Param]]
+  ): PathParamSerializer[CC[Param]] = {
     val name = delegate match {
       case named: NamedPathParamSerializer[_] => s"Traversable[${named.name}]"
       case other                              => s"Traversable($other)"
     }
 
     new NamedPathParamSerializer[CC[Param]](name) {
-      override def serialize(parameter: CC[Param]): Seq[String] = parameter.flatMap(delegate.serialize).to[Seq]
+      override def serialize(parameter: CC[Param]): Seq[String] = parameter.flatMap(delegate.serialize).toIndexedSeq
       override def deserialize(parameters: Seq[String]): CC[Param] = {
-        val builder = bf()
-        builder.sizeHint(parameters)
-        builder ++= parameters.map(param => delegate.deserialize(Seq(param)))
-        builder.result()
+        bf.fromSpecific(parameters.iterator.map(param => delegate.deserialize(Seq(param))))
       }
     }
   }

@@ -1,10 +1,12 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.javadsl.persistence.jdbc
 
 import java.util.concurrent.CompletionStage
-import javax.inject.{ Inject, Singleton }
+import javax.inject.Inject
+import javax.inject.Singleton
 
 import com.lightbend.lagom.javadsl.persistence.jdbc.JdbcSession
 import com.lightbend.lagom.javadsl.persistence.jdbc.JdbcSession.ConnectionFunction
@@ -16,7 +18,6 @@ import scala.compat.java8.FutureConverters._
  */
 @Singleton
 final class JdbcSessionImpl @Inject() (slick: SlickProvider) extends JdbcSession {
-
   import slick.profile.api._
 
   override def withConnection[T](block: ConnectionFunction[T]): CompletionStage[T] = {
@@ -34,5 +35,4 @@ final class JdbcSessionImpl @Inject() (slick: SlickProvider) extends JdbcSession
       }.transactionally
     }.toJava
   }
-
 }

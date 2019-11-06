@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.playjson
 
 import play.api.libs.json._
@@ -9,19 +10,19 @@ import scala.collection.immutable
 import scala.reflect.ClassTag
 
 /**
- * Conveneince factories to create [[JsonMigration]]s.
+ * Convenience factories to create [[JsonMigration]]s.
  */
 object JsonMigrations {
-
   def apply(
-    currentVersion:          Int,
-    transformation:          (Int, JsValue) => JsValue,
-    classNameTransformation: (Int, String) => String
+      currentVersion: Int,
+      transformation: (Int, JsValue) => JsValue,
+      classNameTransformation: (Int, String) => String
   ): JsonMigration =
     new JsonMigration(currentVersion) {
-      override def transform(fromVersion: Int, json: JsObject): JsValue = transformation(fromVersion, json)
+      override def transform(fromVersion: Int, json: JsObject): JsValue     = transformation(fromVersion, json)
       override def transformValue(fromVersion: Int, json: JsValue): JsValue = transformation(fromVersion, json)
-      override def transformClassName(fromVersion: Int, className: String): String = classNameTransformation(fromVersion, className)
+      override def transformClassName(fromVersion: Int, className: String): String =
+        classNameTransformation(fromVersion, className)
     }
 
   /**
@@ -74,7 +75,6 @@ object JsonMigrations {
  * current class name.
  */
 abstract class JsonMigration(val currentVersion: Int) {
-
   /**
    * Override to provide transformation of the old JSON structure to the new
    * JSON structure.
@@ -98,5 +98,4 @@ abstract class JsonMigration(val currentVersion: Int) {
    * current class name.
    */
   def transformClassName(fromVersion: Int, className: String): String = className
-
 }

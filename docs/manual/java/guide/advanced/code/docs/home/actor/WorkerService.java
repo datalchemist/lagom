@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.home.actor;
 
 import com.lightbend.lagom.javadsl.api.Descriptor;
@@ -11,8 +15,6 @@ public interface WorkerService extends Service {
 
   @Override
   default Descriptor descriptor() {
-    return named("/worker").withCalls(
-      call(this::doWork)
-    );
+    return named("/worker").withCalls(call(this::doWork));
   }
 }

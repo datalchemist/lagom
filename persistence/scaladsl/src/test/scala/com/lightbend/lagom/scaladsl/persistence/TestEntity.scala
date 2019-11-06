@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.persistence
 
 import akka.actor.ActorRef
@@ -9,12 +10,12 @@ import akka.actor.Address
 import akka.cluster.Cluster
 import com.lightbend.lagom.scaladsl.persistence.PersistentEntity.ReplyType
 import com.lightbend.lagom.scaladsl.persistence.testkit.SimulatedNullpointerException
-import com.lightbend.lagom.scaladsl.playjson.{ JsonSerializerRegistry, JsonSerializer }
+import com.lightbend.lagom.scaladsl.playjson.JsonSerializerRegistry
+import com.lightbend.lagom.scaladsl.playjson.JsonSerializer
 
 import scala.collection.immutable
 
 object TestEntity {
-
   object SharedFormats {
     import play.api.libs.json._
 
@@ -23,7 +24,8 @@ object TestEntity {
         case JsString("append")  => JsSuccess(Mode.Append)
         case JsString("prepend") => JsSuccess(Mode.Prepend)
         case js                  => JsError(s"unknown mode js: $js")
-      }, Writes[Mode] {
+      },
+      Writes[Mode] {
         case Mode.Append  => JsString("append")
         case Mode.Prepend => JsString("prepend")
       }
@@ -44,7 +46,6 @@ object TestEntity {
       JsonSerializer(emptySingletonFormat(GetAddress)),
       JsonSerializer(emptySingletonFormat(Clear))
     )
-
   }
 
   sealed trait Cmd
@@ -56,7 +57,7 @@ object TestEntity {
   sealed trait Mode
   object Mode {
     case object Prepend extends Mode
-    case object Append extends Mode
+    case object Append  extends Mode
   }
 
   final case class ChangeMode(mode: Mode) extends Cmd with ReplyType[Evt]
@@ -131,16 +132,14 @@ object TestEntitySerializerRegistry extends JsonSerializerRegistry {
   import TestEntity._
 
   override def serializers: immutable.Seq[JsonSerializer[_]] = Cmd.serializers ++ Evt.serializers ++ State.serializers
-
 }
 
-class TestEntity(system: ActorSystem)
-  extends PersistentEntity {
+class TestEntity(system: ActorSystem) extends PersistentEntity {
   import TestEntity._
 
   override type Command = Cmd
-  override type Event = Evt
-  override type State = TestEntity.State
+  override type Event   = Evt
+  override type State   = TestEntity.State
 
   def this(system: ActorSystem, probe: Option[ActorRef]) = {
     this(system)
@@ -234,5 +233,4 @@ class TestEntity(system: ActorSystem)
     probe.foreach(_ ! AfterRecovery(state))
     state
   }
-
 }

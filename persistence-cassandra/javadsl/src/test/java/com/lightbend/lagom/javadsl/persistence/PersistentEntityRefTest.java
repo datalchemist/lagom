@@ -1,13 +1,16 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.javadsl.persistence;
 
+import static com.lightbend.lagom.internal.persistence.testkit.AwaitPersistenceInit.awaitPersistenceInit;
+import static com.lightbend.lagom.internal.persistence.testkit.PersistenceTestConfig.ClusterConfig;
+import static com.lightbend.lagom.internal.persistence.testkit.PersistenceTestConfig.cassandraConfig;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 
-import com.lightbend.lagom.javadsl.persistence.cassandra.testkit.TestUtil;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import com.lightbend.lagom.javadsl.persistence.PersistentEntity.InvalidCommandException;
@@ -16,6 +19,7 @@ import com.lightbend.lagom.javadsl.persistence.TestEntity.Cmd;
 import com.lightbend.lagom.javadsl.persistence.TestEntity.Evt;
 import com.lightbend.lagom.javadsl.persistence.TestEntity.State;
 import java.io.File;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -29,6 +33,7 @@ import org.junit.Test;
 import play.Application;
 import play.inject.Injector;
 import play.inject.guice.GuiceApplicationBuilder;
+import scala.concurrent.Await;
 import scala.concurrent.duration.FiniteDuration;
 
 import akka.actor.ActorSystem;
@@ -43,17 +48,12 @@ public class PersistentEntityRefTest {
 
   @BeforeClass
   public static void setup() {
-    Config config = ConfigFactory.parseString(
-        "akka.actor.provider = akka.cluster.ClusterActorRefProvider \n" +
-        "akka.remote.netty.tcp.port = 0 \n" +
-        "akka.remote.netty.tcp.hostname = 127.0.0.1 \n" +
-        "akka.loglevel = INFO \n" +
-        "akka.cluster.sharding.distributed-data.durable.keys = [] \n")
-        .withFallback(TestUtil.persistenceConfig("PersistentEntityRefTest", CassandraLauncher.randomPort()));
+    Config config =
+        ConfigFactory.parseString("akka.loglevel = INFO")
+            .withFallback(
+                cassandraConfig("PersistentEntityRefTest", CassandraLauncher.randomPort()));
 
-    application = new GuiceApplicationBuilder()
-            .configure(config)
-            .build();
+    application = new GuiceApplicationBuilder().configure(config).build();
     injector = application.injector();
 
     ActorSystem system = injector.instanceOf(ActorSystem.class);
@@ -62,14 +62,12 @@ public class PersistentEntityRefTest {
 
     File cassandraDirectory = new File("target/PersistentEntityRefTest");
     CassandraLauncher.start(cassandraDirectory, "lagom-test-embedded-cassandra.yaml", true, 0);
-    TestUtil.awaitPersistenceInit(system);
-
+    awaitPersistenceInit(system);
   }
 
-
   @AfterClass
-  public static void teardown() {
-    application.getWrappedApplication().stop();
+  public static void teardown() throws Exception {
+    Await.ready(application.asScala().stop(), FiniteDuration.create("10s"));
     CassandraLauncher.stop();
   }
 
@@ -108,8 +106,8 @@ public class PersistentEntityRefTest {
 
   @Test(expected = AskTimeoutException.class)
   public void testAskTimeout() throws Throwable {
-    PersistentEntityRef<Cmd> ref = registry().refFor(TestEntity.class, "10").withAskTimeout(
-        FiniteDuration.create(1, MILLISECONDS));
+    PersistentEntityRef<Cmd> ref =
+        registry().refFor(TestEntity.class, "10").withAskTimeout(Duration.ofMillis(1));
 
     List<CompletionStage<Evt>> replies = new ArrayList<>();
     for (int i = 0; i < 100; i++) {
@@ -165,5 +163,4 @@ public class PersistentEntityRefTest {
   public void testUnregistered() throws Throwable {
     registry().refFor(AnotherEntity.class, "1");
   }
-
 }

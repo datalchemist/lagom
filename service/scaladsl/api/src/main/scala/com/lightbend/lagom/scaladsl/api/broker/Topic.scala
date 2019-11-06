@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.api.broker
 
 /**
@@ -20,11 +21,9 @@ trait Topic[Payload] {
    * @return A Subscriber to this topic.
    */
   def subscribe: Subscriber[Payload]
-
 }
 
 object Topic {
-
   /**
    * A topic identifier.
    */
@@ -40,5 +39,4 @@ object Topic {
   }
 
   private case class TopicIdImpl(name: String) extends TopicId
-
 }

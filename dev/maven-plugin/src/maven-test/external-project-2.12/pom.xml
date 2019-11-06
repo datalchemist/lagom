@@ -38,12 +38,14 @@
                             </artifact>
                         </externalProject>
                     </externalProjects>
+                    <!-- kafka is not needed  -->
+                    <kafkaEnabled>false</kafkaEnabled>
                 </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.5.1</version>
+                <version>3.8.1</version>
                 <configuration>
                     <source>1.8</source>
                     <target>1.8</target>
@@ -71,4 +73,14 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <scala.binary.version>2.12</scala.binary.version>
     </properties>
+
+    <repositories>
+        <repository>
+            <id>akka-snapshots</id>
+            <name>Akka Snapshots</name>
+            <url>https://repo.akka.io/snapshots/</url>
+            <layout>default</layout>
+            <snapshots><enabled>false</enabled></snapshots> <!-- as in, no -SNAPSHOT dependencies -->
+        </repository>
+    </repositories>
 </project>

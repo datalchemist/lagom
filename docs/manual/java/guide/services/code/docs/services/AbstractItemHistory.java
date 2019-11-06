@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.services;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
@@ -10,6 +14,6 @@ import org.immutables.value.Value;
 @JsonSerialize(as = ItemHistory.class)
 @JsonDeserialize(as = ItemHistory.class)
 public interface AbstractItemHistory {
-    @Value.Parameter
-    long id();
+  @Value.Parameter
+  long id();
 }

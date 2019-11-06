@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.serialization;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
@@ -18,5 +19,4 @@ public interface AbstractEvent2 extends Jsonable {
 
   @Parameter
   int getField2(); // new mandatory field
-
 }

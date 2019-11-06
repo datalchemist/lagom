@@ -1,9 +1,11 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.util
 
-import java.io.{ File, FileInputStream }
+import java.io.File
+import java.io.FileInputStream
 import java.util.Properties
 
 object PropertiesLoader {

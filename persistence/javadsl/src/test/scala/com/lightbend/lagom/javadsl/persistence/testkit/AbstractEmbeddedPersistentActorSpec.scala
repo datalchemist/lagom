@@ -1,23 +1,25 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.javadsl.persistence.testkit
 
-import akka.actor.{ ActorRef, ActorSystem, Props, actorRef2Scala }
+import akka.actor.ActorRef
+import akka.actor.Props
+import akka.actor.actorRef2Scala
 import akka.persistence.PersistentActor
-import akka.testkit.{ ImplicitSender, TestKitBase }
 import com.lightbend.lagom.persistence.ActorSystemSpec
-import com.lightbend.lagom.persistence.PersistenceSpec
-import org.scalatest.{ Matchers, WordSpecLike }
+import com.lightbend.lagom.serialization.Jsonable
 
 import scala.concurrent.duration._
 
 object AbstractEmbeddedPersistentActorSpec {
-
-  final case class Cmd(data: String)
-  final case class Evt(data: String)
-  case object Get
-  final case class State(data: Vector[String] = Vector.empty) {
+  // All commands and events extending Jsonable so that the
+  // tests will use Jackson serialization instead of Java's.
+  case object Get                    extends Jsonable
+  final case class Cmd(data: String) extends Jsonable
+  final case class Evt(data: String) extends Jsonable
+  final case class State(data: Vector[String] = Vector.empty) extends Jsonable {
     def apply(evt: Evt): State = {
       copy(data :+ evt.data)
     }
@@ -41,7 +43,6 @@ object AbstractEmbeddedPersistentActorSpec {
       case Get => sender() ! state
     }
   }
-
 }
 
 trait AbstractEmbeddedPersistentActorSpec { spec: ActorSystemSpec =>
@@ -65,7 +66,5 @@ trait AbstractEmbeddedPersistentActorSpec { spec: ActorSystemSpec =>
       p2 ! Get
       expectMsg(State(Vector("A", "B", "C")))
     }
-
   }
-
 }

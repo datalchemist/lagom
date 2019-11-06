@@ -1,25 +1,24 @@
-// Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+// Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
 
-buildInfoSettings
-sourceGenerators in Compile += buildInfo.taskValue
+addSbtPlugin("com.eed3si9n" % "sbt-buildinfo" % "0.9.0")
 
-libraryDependencies ++= Seq(
-  "org.scala-sbt" % "scripted-plugin" % sbtVersion.value
-)
+addSbtPlugin("com.eed3si9n" % "sbt-unidoc" % "0.4.2")
 
-addSbtPlugin("com.eed3si9n" % "sbt-unidoc" % "0.3.3")
-addSbtPlugin("de.heikoseeberger" % "sbt-header" % "1.8.0")
-addSbtPlugin("org.xerial.sbt" % "sbt-sonatype" % "0.5.0")
-addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.3")
-addSbtPlugin("com.jsuereth" % "sbt-pgp" % "1.0.0")
-addSbtPlugin("me.lessis" % "bintray-sbt" % "0.3.0")
-// need this for com.typesafe.sbt.preprocess.Preprocess
-addSbtPlugin("com.typesafe.sbt" % "sbt-site" % "0.7.1")
-addSbtPlugin("org.scalariform" % "sbt-scalariform" % "1.6.0")
-addSbtPlugin("com.typesafe.sbt" % "sbt-multi-jvm" % "0.3.8")
-addSbtPlugin("com.typesafe.sbteclipse" % "sbteclipse-plugin" % "5.2.1")
-addSbtPlugin("com.typesafe" % "sbt-mima-plugin" % "0.1.13")
-addSbtPlugin("com.eed3si9n" % "sbt-doge" % "0.1.5")
+// the plugins used during release can have an impact on default values
+// of the build. To validate your changes on the release plugins don't
+// affect the release process, review https://github.com/lagom/lagom/issues/1496#issuecomment-408398508
+addSbtPlugin("de.heikoseeberger" % "sbt-header"   % "5.2.0")
+addSbtPlugin("org.xerial.sbt"    % "sbt-sonatype" % "3.8")
+addSbtPlugin("com.github.gseitz" % "sbt-release"  % "1.0.12")
+addSbtPlugin("com.jsuereth"      % "sbt-pgp"      % "2.0.0")
+addSbtPlugin("org.foundweekends" % "sbt-bintray"  % "0.5.5")
 
-addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.8.2")
-addSbtPlugin("com.lightbend" % "sbt-whitesource" % "0.1.10")
+addSbtPlugin("com.typesafe.sbt" % "sbt-multi-jvm"   % "0.4.0")
+addSbtPlugin("com.typesafe"     % "sbt-mima-plugin" % "0.6.1")
+
+addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.9.2")
+addSbtPlugin("com.lightbend"    % "sbt-whitesource"      % "0.1.18")
+
+addSbtPlugin("com.lightbend.sbt" % "sbt-java-formatter" % "0.4.4")
+addSbtPlugin("org.scalameta"     % "sbt-scalafmt"       % "2.2.1")
+addSbtPlugin("com.dwijnand"      % "sbt-dynver"         % "4.0.0")

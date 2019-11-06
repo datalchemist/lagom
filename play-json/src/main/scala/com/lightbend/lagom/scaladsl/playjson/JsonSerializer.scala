@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.playjson
 
 import play.api.libs.json._
@@ -9,7 +10,6 @@ import scala.collection.immutable.Seq
 import scala.reflect.ClassTag
 
 object JsonSerializer {
-
   /**
    * Creates a format that will serialize and deserialize a singleton to an empty js object
    */
@@ -49,7 +49,8 @@ object JsonSerializer {
     CompressedJsonSerializerImpl(implicitly[ClassTag[T]].runtimeClass.asInstanceOf[Class[T]], format)
 
   private[lagom] case class JsonSerializerImpl[T](entityClass: Class[T], format: Format[T]) extends JsonSerializer[T]
-  private[lagom] case class CompressedJsonSerializerImpl[T](entityClass: Class[T], format: Format[T]) extends JsonSerializer[T]
+  private[lagom] case class CompressedJsonSerializerImpl[T](entityClass: Class[T], format: Format[T])
+      extends JsonSerializer[T]
 }
 
 /**

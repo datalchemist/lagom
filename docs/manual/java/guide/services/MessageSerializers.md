@@ -1,6 +1,6 @@
 # Message Serializers
 
-Out of the box, Lagom uses Jackson to serialize request and response messages.  However, you can define custom serializers on a per service call basis, as well register a serializer for a given type for the whole service, and finally you can also customise the serialization factory used by Lagom to completely change the serializers Lagom uses when no serializer is selected.
+Out of the box, Lagom uses Jackson to serialize request and response messages.  However, you can define custom serializers on a per service call basis, as well register a serializer for a given type for the whole service, and finally you can also customize the serialization factory used by Lagom to completely change the serializers Lagom uses when no serializer is selected.
 
 ## How Lagom selects a message serializer
 
@@ -16,9 +16,9 @@ This can be overridden when defining the service call in the descriptor:
 
 ### Per type message serializers
 
-If no message serializer has been provided at the service call level, Lagom then checks whether a serializer has been registered at the service level for that type.  Each service maintains a map of types to serializers for that type, and these are used as appropriate for service calls that match the types in the map.
+If no message serializer has been provided at the service call level, Lagom then checks whether a serializer has been registered at the service level for that type. Each service maintains a map of types to serializers for that type, and these are used as appropriate for service calls that match the types in the map.
 
-Lagom provides a number of serializers out of the box at this level, including serializers for `String` and `NotUsed`.  Custom type level serializers can also be supplied in the descriptor using the [`Descriptor.with`](api/index.html?com/lightbend/lagom/javadsl/api/Descriptor.html#with-java.lang.reflect.Type-com.lightbend.lagom.javadsl.api.deser.MessageSerializer-) method:
+Lagom provides a number of serializers out of the box at this level, including serializers for `String`, `Done`, `NotUsed` and `ByteString`. Note that serializer for `ByteString` doesn't modify data and sends `ByteString` as is. Custom type level serializers can also be supplied in the descriptor using the [`Descriptor.with`](api/index.html?com/lightbend/lagom/javadsl/api/Descriptor.html#with-java.lang.reflect.Type-com.lightbend.lagom.javadsl.api.deser.MessageSerializer-) method:
 
 @[type-serializer](code/docs/services/MessageSerializers.java)
 
@@ -26,7 +26,7 @@ Lagom provides a number of serializers out of the box at this level, including s
 
 If neither a per service call nor per type message serializer has been found, Lagom will finally request its serializer factory for a serializer for a type.  When using the defaults, this is the way Lagom will usually locate serializers for your types.
 
-Lagom provides a [`SerializerFactory`](api/index.html?com/lightbend/lagom/javadsl/api/deser/SerializerFactory.html) interface for dynamically looking up and creating serializers for types.  The default implementation provided by Lagom is a Jackson serializer factory, which serializes to/from JSON.  You can customize which `SerializerFactory` is used by supplying it to the [`Descriptor.with`](api/index.html?com/lightbend/lagom/javadsl/api/Descriptor.html#with-com.lightbend.lagom.javadsl.api.deser.SerializerFactory-) method when declaring the signature:
+Lagom provides a [`SerializerFactory`](api/index.html?com/lightbend/lagom/javadsl/api/deser/SerializerFactory.html) interface for dynamically looking up and creating serializers for types.  The default implementation provided by Lagom is a Jackson serializer factory, which serializes to/from JSON.  You can customize which `SerializerFactory` is used by supplying it to the [`Descriptor.withMessageSerializer`](api/index.html?com/lightbend/lagom/javadsl/api/Descriptor.html#withMessageSerializer-java.lang.Class-com.lightbend.lagom.javadsl.api.deser.MessageSerializer-) method when declaring the signature:
 
 @[with-serializer-factory](code/docs/services/MessageSerializers.java)
 

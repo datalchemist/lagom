@@ -1,34 +1,55 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.javadsl.broker.kafka
 
+import java.io.Closeable
+import java.io.File
 import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.{ CompletableFuture, CompletionStage, CountDownLatch, TimeUnit }
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
-import akka.actor.ActorSystem
-import akka.cluster.Cluster
 import akka.japi.{ Pair => JPair }
-import akka.persistence.query.{ NoOffset, Offset, Sequence }
+import akka.persistence.query.NoOffset
+import akka.persistence.query.Offset
+import akka.persistence.query.Sequence
+import akka.stream.OverflowStrategy
 import akka.stream.javadsl.{ Source => JSource }
-import akka.stream.scaladsl.{ Flow, Sink, Source, SourceQueue }
-import akka.stream.{ Materializer, OverflowStrategy }
-import akka.{ Done, NotUsed }
+import akka.stream.scaladsl.Flow
+import akka.stream.scaladsl.Sink
+import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.SourceQueue
+import akka.Done
+import akka.NotUsed
 import com.google.inject.AbstractModule
+import com.lightbend.lagom.dev.MiniLogger
+import com.lightbend.lagom.dev.Servers.KafkaServer
 import com.lightbend.lagom.internal.javadsl.broker.kafka.JavadslKafkaApiSpec._
-import com.lightbend.lagom.internal.javadsl.persistence.OffsetAdapter.{ dslOffsetToOffset, offsetToDslOffset }
-import com.lightbend.lagom.internal.kafka.KafkaLocalServer
+import com.lightbend.lagom.internal.javadsl.persistence.OffsetAdapter.dslOffsetToOffset
+import com.lightbend.lagom.internal.javadsl.persistence.OffsetAdapter.offsetToDslOffset
 import com.lightbend.lagom.javadsl.api.ScalaService._
-import com.lightbend.lagom.javadsl.api._
-import com.lightbend.lagom.javadsl.api.broker.kafka.{ KafkaProperties, PartitionKeyStrategy }
-import com.lightbend.lagom.javadsl.api.broker.{ Message, Topic }
+import com.lightbend.lagom.javadsl.api.broker.kafka.KafkaProperties
+import com.lightbend.lagom.javadsl.api.broker.kafka.PartitionKeyStrategy
+import com.lightbend.lagom.javadsl.api.broker.Message
+import com.lightbend.lagom.javadsl.api.broker.Topic
+import com.lightbend.lagom.javadsl.api.Descriptor
+import com.lightbend.lagom.javadsl.api.Service
+import com.lightbend.lagom.javadsl.api.ServiceLocator
 import com.lightbend.lagom.javadsl.broker.TopicProducer
 import com.lightbend.lagom.javadsl.broker.kafka.KafkaMetadataKeys
-import com.lightbend.lagom.javadsl.persistence.{ AggregateEvent, AggregateEventTag, PersistentEntityRef, PersistentEntityRegistry, Offset => JOffset }
+import com.lightbend.lagom.javadsl.client.ConfigurationServiceLocator
+import com.lightbend.lagom.javadsl.persistence.AggregateEvent
+import com.lightbend.lagom.javadsl.persistence.AggregateEventTag
+import com.lightbend.lagom.javadsl.persistence.PersistentEntityRef
+import com.lightbend.lagom.javadsl.persistence.PersistentEntityRegistry
+import com.lightbend.lagom.javadsl.persistence.{ Offset => JOffset }
 import com.lightbend.lagom.javadsl.server.ServiceGuiceSupport
-import com.lightbend.lagom.spi.persistence.{ InMemoryOffsetStore, OffsetStore }
-import org.scalatest.concurrent.ScalaFutures
+import com.lightbend.lagom.spi.persistence.InMemoryOffsetStore
+import com.lightbend.lagom.spi.persistence.OffsetStore
 import org.scalatest._
+import org.scalatest.concurrent.ScalaFutures
+import org.slf4j.LoggerFactory
 import play.api.inject._
 import play.api.inject.guice.GuiceApplicationBuilder
 
@@ -36,16 +57,27 @@ import scala.collection.mutable
 import scala.compat.java8.FunctionConverters._
 import scala.compat.java8.OptionConverters._
 import scala.concurrent.duration._
-import scala.concurrent.{ Await, ExecutionContext, Promise }
+import scala.concurrent.Await
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Promise
 
-class JavadslKafkaApiSpec extends WordSpecLike
-  with Matchers
-  with BeforeAndAfter
-  with BeforeAndAfterAll
-  with ScalaFutures
-  with OptionValues {
+class JavadslKafkaApiSpec
+    extends WordSpecLike
+    with Matchers
+    with BeforeAndAfter
+    with BeforeAndAfterAll
+    with ScalaFutures
+    with OptionValues {
+  private val log = LoggerFactory.getLogger(getClass)
+  private val miniLogger = new MiniLogger {
+    def debug(message: => String): Unit = log.debug(message)
+    def info(message: => String): Unit  = log.info(message)
+  }
 
   private lazy val offsetStore = new InMemoryOffsetStore
+
+  private final val kafkaPort          = 9092
+  private final val kafkaZooKeeperPort = 2181
 
   private val application = {
     new GuiceApplicationBuilder()
@@ -56,24 +88,36 @@ class JavadslKafkaApiSpec extends WordSpecLike
         bind[ServiceLocator].to[ConfigurationServiceLocator]
       )
       .configure(
-        "akka.remote.netty.tcp.port" -> "0",
-        "akka.remote.netty.tcp.hostname" -> "127.0.0.1",
-        "akka.persistence.journal.plugin" -> "akka.persistence.journal.inmem",
-        "akka.persistence.snapshot-store.plugin" -> "akka.persistence.snapshot-store.local",
-        "lagom.services.kafka_native" -> s"tcp://localhost:${KafkaLocalServer.DefaultPort}"
+        "akka.remote.artery.canonical.port"             -> "0",
+        "akka.remote.artery.canonical.hostname"         -> "127.0.0.1",
+        "akka.persistence.journal.plugin"               -> "akka.persistence.journal.inmem",
+        "akka.persistence.snapshot-store.plugin"        -> "akka.persistence.snapshot-store.local",
+        "lagom.cluster.join-self"                       -> "on",
+        "lagom.cluster.exit-jvm-when-system-terminated" -> "off",
+        "lagom.cluster.bootstrap.enabled"               -> "off",
+        "lagom.services.kafka_native"                   -> s"tcp://localhost:$kafkaPort"
       )
       .build()
   }
 
-  private val kafkaServer = KafkaLocalServer(cleanOnStart = true)
+  private val kafkaServerClasspath: Seq[File] = TestBuildInfo.fullClasspath.toIndexedSeq
+  private var kafkaServer: Option[Closeable]  = None
 
   override def beforeAll(): Unit = {
     super.beforeAll()
 
-    kafkaServer.start()
-
-    val system = application.injector.instanceOf(classOf[ActorSystem])
-    Cluster(system).join(Cluster(system).selfAddress)
+    kafkaServer = Some(
+      KafkaServer.start(
+        log = miniLogger,
+        cp = kafkaServerClasspath,
+        kafkaPort = kafkaPort,
+        zooKeeperPort = kafkaZooKeeperPort,
+        kafkaPropertiesFile = None,
+        jvmOptions = Nil,
+        targetDir = TestBuildInfo.target,
+        cleanOnStart = true,
+      )
+    )
   }
 
   before {
@@ -83,28 +127,32 @@ class JavadslKafkaApiSpec extends WordSpecLike
 
   override def afterAll(): Unit = {
     application.stop().futureValue
-    kafkaServer.stop()
+
+    kafkaServer.foreach(_.close())
+    kafkaServer = None
 
     super.afterAll()
   }
 
-  override implicit val patienceConfig = PatienceConfig(30.seconds, 150.millis)
+  implicit override val patienceConfig = PatienceConfig(30.seconds, 150.millis)
   import application.materializer
 
   "The Kafka message broker api" should {
-
     val testService = application.injector.instanceOf(classOf[JavadslKafkaApiSpec.TestService])
 
     "eagerly publish event stream registered in the service topic implementation" in {
       val messageReceived = Promise[String]()
-      testService.test1Topic()
+      testService
+        .test1Topic()
         .subscribe()
         .withGroupId("testservice1")
         .atLeastOnce {
-          Flow[String].map { message =>
-            messageReceived.trySuccess(message)
-            Done
-          }.asJava
+          VarianceCompat.asJava {
+            Flow[String].map { message =>
+              messageReceived.trySuccess(message)
+              Done
+            }
+          }
         }
 
       val messageToPublish = "msg"
@@ -115,20 +163,23 @@ class JavadslKafkaApiSpec extends WordSpecLike
 
     "self-heal if failure occurs while running the publishing stream" in {
       // Create a subscriber that tracks the first two messages it receives
-      val firstTimeReceived = Promise[String]()
+      val firstTimeReceived  = Promise[String]()
       val secondTimeReceived = Promise[String]()
-      testService.test2Topic()
+      testService
+        .test2Topic()
         .subscribe()
         .withGroupId("testservice2")
         .atLeastOnce {
-          Flow[String].map { message =>
-            if (!firstTimeReceived.isCompleted) {
-              firstTimeReceived.trySuccess(message)
-            } else if (!secondTimeReceived.isCompleted)
-              secondTimeReceived.trySuccess(message)
-            else ()
-            Done
-          }.asJava
+          VarianceCompat.asJava {
+            Flow[String].map { message =>
+              if (!firstTimeReceived.isCompleted) {
+                firstTimeReceived.trySuccess(message)
+              } else if (!secondTimeReceived.isCompleted)
+                secondTimeReceived.trySuccess(message)
+              else ()
+              Done
+            }
+          }
         }
 
       // Insert a mapping function into the producer flow that transforms each message
@@ -185,12 +236,9 @@ class JavadslKafkaApiSpec extends WordSpecLike
         offsetStore.prepare("topicProducer-" + testService.test3Topic().topicId().value(), "singleton").futureValue
 
       // No message was consumed from this topic, hence we expect the last stored offset to be NoOffset
-      val offsetDao = reloadOffset()
+      val offsetDao     = reloadOffset()
       val initialOffset = offsetDao.loadedOffset
       initialOffset shouldBe NoOffset
-
-      // Fake setting an offset to simulate a topic that has been restarted
-      offsetDao.saveOffset(Sequence(1))
 
       // Put some messages in the stream
       test3EventJournal.append("firstMessage")
@@ -199,14 +247,17 @@ class JavadslKafkaApiSpec extends WordSpecLike
 
       // Wait for a subscriber to consume them all (which ensures they've all been published)
       val allMessagesReceived = new CountDownLatch(3)
-      testService.test3Topic()
+      testService
+        .test3Topic()
         .subscribe()
         .withGroupId("testservice3")
         .atLeastOnce {
-          Flow[String].map { _ =>
-            allMessagesReceived.countDown()
-            Done
-          }.asJava
+          VarianceCompat.asJava {
+            Flow[String].map { _ =>
+              allMessagesReceived.countDown()
+              Done
+            }
+          }
         }
       assert(allMessagesReceived.await(10, TimeUnit.SECONDS))
 
@@ -220,19 +271,24 @@ class JavadslKafkaApiSpec extends WordSpecLike
       val materialized = new CountDownLatch(2)
 
       @volatile var failOnMessageReceived = true
-      testService.test4Topic()
+      testService
+        .test4Topic()
         .subscribe()
         .withGroupId("testservice4")
         .atLeastOnce {
-          Flow[String].map { _ =>
-            if (failOnMessageReceived) {
-              failOnMessageReceived = false
-              println("Expect to see an error below: Simulate consumer failure")
-              throw new IllegalStateException("Simulate consumer failure")
-            } else Done
-          }.mapMaterializedValue { _ =>
-            materialized.countDown()
-          }.asJava
+          VarianceCompat.asJava {
+            Flow[String]
+              .map { _ =>
+                if (failOnMessageReceived) {
+                  failOnMessageReceived = false
+                  println("Expect to see an error below: Simulate consumer failure")
+                  throw new IllegalStateException("Simulate consumer failure")
+                } else Done
+              }
+              .mapMaterializedValue { _ =>
+                materialized.countDown()
+              }
+          }
         }
 
       test4EventJournal.append("message")
@@ -250,7 +306,8 @@ class JavadslKafkaApiSpec extends WordSpecLike
       // Now we register a consumer that will fail while processing a message. Because we are using at-most-once
       // delivery, the message that caused the failure won't be re-processed.
       @volatile var countProcessedMessages = 0
-      val expectFailure = testService.test5Topic()
+      val expectFailure = testService
+        .test5Topic()
         .subscribe()
         .withGroupId("testservice5")
         .atMostOnceSource()
@@ -269,16 +326,20 @@ class JavadslKafkaApiSpec extends WordSpecLike
 
     "allow the consumer to batch" in {
       val batchSize = 4
-      val latch = new CountDownLatch(batchSize)
-      testService.test6Topic()
+      val latch     = new CountDownLatch(batchSize)
+      testService
+        .test6Topic()
         .subscribe()
+        .withGroupId("testservice6")
         .atLeastOnce {
-          Flow[String].grouped(batchSize).mapConcat { messages =>
-            messages.map { _ =>
-              latch.countDown()
-              Done
+          VarianceCompat.asJava {
+            Flow[String].grouped(batchSize).mapConcat { messages =>
+              messages.map { _ =>
+                latch.countDown()
+                Done
+              }
             }
-          }.asJava
+          }
         }
       for (i <- 1 to batchSize) test6EventJournal.append(i.toString)
       assert(latch.await(10, TimeUnit.SECONDS))
@@ -295,13 +356,17 @@ class JavadslKafkaApiSpec extends WordSpecLike
       )
 
       messages.size shouldBe 3
+
       def runAssertions(msg: Message[String]): Unit = {
         msg.messageKeyAsString shouldBe "A"
         msg.get(KafkaMetadataKeys.TOPIC).asScala.value shouldBe "test7"
-        msg.get(KafkaMetadataKeys.HEADERS) should not be None
+        msg.get(KafkaMetadataKeys.HEADERS).asScala should not be None
+        msg.get(KafkaMetadataKeys.TIMESTAMP).asScala should not be None
+        msg.get(KafkaMetadataKeys.TIMESTAMP_TYPE).asScala should not be None
         msg.get(KafkaMetadataKeys.PARTITION).asScala.value shouldBe
           messages.head.get(KafkaMetadataKeys.PARTITION).asScala.value
       }
+
       messages.foreach(runAssertions)
       messages.head.getPayload shouldBe "A1"
       val offset = messages.head.get(KafkaMetadataKeys.OFFSET).asScala.value
@@ -310,13 +375,21 @@ class JavadslKafkaApiSpec extends WordSpecLike
       messages(2).getPayload shouldBe "A3"
       messages(2).get(KafkaMetadataKeys.OFFSET).asScala.value shouldBe (offset + 2)
     }
-
   }
+}
 
+object VarianceCompat {
+  import akka.stream.javadsl
+  import akka.stream.scaladsl
+  // Akka 2.5.21 removed the variance of the return types, as a consequence the compiler
+  // no longer accepts an xx.asJava that returns a supertype. This implementation of asJava
+  // helps the compiler.
+  def asJava[T, Q, R](in: scaladsl.Flow[T, Q, R]): javadsl.Flow[T, Q, R] = {
+    in.asJava
+  }
 }
 
 object JavadslKafkaApiSpec {
-
   private val test1EventJournal = new EventJournal[String]
   private val test2EventJournal = new EventJournal[String]
   private val test3EventJournal = new EventJournal[String]
@@ -381,9 +454,9 @@ object JavadslKafkaApiSpec {
 
   class EventJournal[Event] {
     private type Element = (Event, Sequence)
-    private val offset = new AtomicLong()
-    private val storedEvents = mutable.MutableList.empty[Element]
-    private val subscribers = mutable.MutableList.empty[SourceQueue[Element]]
+    private val offset       = new AtomicLong()
+    private val storedEvents = mutable.ListBuffer.empty[Element]
+    private val subscribers  = mutable.ListBuffer.empty[SourceQueue[Element]]
 
     def eventStream(fromOffset: Offset): Source[(Event, Offset), _] = {
       val minOffset: Long = fromOffset match {
@@ -392,7 +465,8 @@ object JavadslKafkaApiSpec {
         case _               => throw new IllegalArgumentException(s"Sequence offset required, but got $fromOffset")
       }
 
-      Source.queue[Element](8, OverflowStrategy.fail)
+      Source
+        .queue[Element](8, OverflowStrategy.fail)
         .mapMaterializedValue { queue =>
           synchronized {
             storedEvents.foreach(queue.offer)
@@ -414,15 +488,20 @@ object JavadslKafkaApiSpec {
   }
 
   object NullPersistentEntityRegistry extends PersistentEntityRegistry {
-    override def eventStream[Event <: AggregateEvent[Event]](aggregateTag: AggregateEventTag[Event], fromOffset: JOffset): JSource[JPair[Event, JOffset], NotUsed] =
+    override def eventStream[Event <: AggregateEvent[Event]](
+        aggregateTag: AggregateEventTag[Event],
+        fromOffset: JOffset
+    ): JSource[JPair[Event, JOffset], NotUsed] =
       JSource.empty()
 
-    override def gracefulShutdown(timeout: FiniteDuration): CompletionStage[Done] = CompletableFuture.completedFuture(Done.getInstance())
-
-    override def refFor[C](entityClass: Class[_ <: com.lightbend.lagom.javadsl.persistence.PersistentEntity[C, _, _]], entityId: String): PersistentEntityRef[C] =
+    override def refFor[C](
+        entityClass: Class[_ <: com.lightbend.lagom.javadsl.persistence.PersistentEntity[C, _, _]],
+        entityId: String
+    ): PersistentEntityRef[C] =
       ???
 
-    override def register[C, E, S](entityClass: Class[_ <: com.lightbend.lagom.javadsl.persistence.PersistentEntity[C, E, S]]): Unit = ()
+    override def register[C, E, S](
+        entityClass: Class[_ <: com.lightbend.lagom.javadsl.persistence.PersistentEntity[C, E, S]]
+    ): Unit = ()
   }
-
 }

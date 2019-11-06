@@ -13,11 +13,14 @@ The version of Lagom can be updated by editing the `project/plugins.sbt` file, a
 addSbtPlugin("com.lightbend.lagom" % "lagom-sbt-plugin" % "1.4.0")
 ```
 
-Lagom 1.4.0 also requires Sbt 0.13.16 or later. If your existing project is using a previous version of Sbt, you will need to upgrade it by editing the `project/build.properties` file. For example:
+Lagom 1.4.0 also requires Sbt 0.13.16 or later (recommended sbt 1.x). If your existing project is using a previous version of Sbt, you will need to upgrade it by editing the `project/build.properties` file. For example:
 
 ```
-sbt.version=0.13.16
+sbt.version=1.1.6
 ```
+
+We also recommend you [upgrade](https://www.scala-sbt.org/download.html) your `sbt` launcher.
+
 
 
 ## Scala 2.12 support
@@ -27,13 +30,13 @@ Lagom is now cross compiled to Scala 2.11 and 2.12. It's recommended to upgrade 
 The Scala version can be updated by editing the `build.sbt` file, and updating the `scalaVersion` settings, for example:
 
 ```scala
-scalaVersion in ThisBuild := "2.12.4"
+scalaVersion in ThisBuild := "2.12.10"
 ```
 
 
 ## Akka HTTP as the default server engine
 
-Play 2.6 introduces a new default server engine implemented using [Akka HTTP](https://doc.akka.io/docs/akka-http/current/scala.html) instead of Netty.
+Play 2.6 introduces a new default server engine implemented using [Akka HTTP](https://doc.akka.io/docs/akka-http/current/?language=scala) instead of Netty.
 
 You can read more in the Play documentation at [Akka HTTP Server Backend](https://www.playframework.com/documentation/2.6.x/AkkaHttpServer).
 
@@ -211,7 +214,7 @@ Other than that difference, refer to the [Akka Rolling Update](https://doc.akka.
 
 ### Downtime upgrade
 
-If your application can tolerate downtime, we recommend you to enable `ddata` and the new serializer for `akka.Done`.
+If your application can tolerate a *one time only* downtime upgrade, we recommend you to enable `ddata` and the new serializers for `akka.Done`, `akka.actor.Address` and `akka.remote.UniqueAddress`. Once this upgrade is complete, further downtime is not required.
 
 In order to achieve this, make sure you have added the following properties to your `application.conf` file.
 
@@ -219,9 +222,11 @@ In order to achieve this, make sure you have added the following properties to y
 # Enable new sharding state store mode by overriding Lagom's default
 akka.cluster.sharding.state-store-mode = ddata
 
-# Enable the serializer for akka.Done provided in Akka 2.5.8+ to avoid the use of Java serialization.
+# Enable serializers provided in Akka 2.5.8+ to avoid the use of Java serialization.
 akka.actor.serialization-bindings {
-  "akka.Done" = akka-misc
+    "akka.Done"                 = akka-misc
+    "akka.actor.Address"        = akka-misc
+    "akka.remote.UniqueAddress" = akka-misc
 }
 ```
 

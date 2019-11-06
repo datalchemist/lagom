@@ -1,24 +1,33 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.it.mocks
 
-import java.util.concurrent.atomic.{ AtomicBoolean, AtomicReference }
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 import akka.stream.Materializer
-import akka.{ Done, NotUsed }
-import akka.stream.scaladsl.{ Sink, Source }
+import akka.Done
+import akka.NotUsed
+import akka.stream.scaladsl.Sink
+import akka.stream.scaladsl.Source
 import akka.util.ByteString
-import com.lightbend.lagom.scaladsl.api.{ CircuitBreaker, Service, ServiceCall }
+import com.lightbend.lagom.scaladsl.api.CircuitBreaker
+import com.lightbend.lagom.scaladsl.api.Service
+import com.lightbend.lagom.scaladsl.api.ServiceCall
 import com.lightbend.lagom.scaladsl.api.Service._
-import com.lightbend.lagom.scaladsl.api.deser.MessageSerializer.{ NegotiatedDeserializer, NegotiatedSerializer }
-import com.lightbend.lagom.scaladsl.api.deser.{ MessageSerializer, StrictMessageSerializer }
+import com.lightbend.lagom.scaladsl.api.deser.MessageSerializer.NegotiatedDeserializer
+import com.lightbend.lagom.scaladsl.api.deser.MessageSerializer.NegotiatedSerializer
+import com.lightbend.lagom.scaladsl.api.deser.MessageSerializer
+import com.lightbend.lagom.scaladsl.api.deser.StrictMessageSerializer
 import com.lightbend.lagom.scaladsl.api.transport._
 import com.lightbend.lagom.scaladsl.server.ServerServiceCall
 import play.api.libs.json.Json
 
 import scala.collection.immutable
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 
 case class MockRequestEntity(field1: String, field2: Int)
 
@@ -27,7 +36,7 @@ object MockRequestEntity {
   def customSerializer(contentType: Option[String]): MessageSerializer[MockRequestEntity, ByteString] =
     new StrictMessageSerializer[MockRequestEntity] {
       override def acceptResponseProtocols =
-        contentType.map(MessageProtocol.empty.withContentType).to[immutable.Seq]
+        contentType.map(MessageProtocol.empty.withContentType).toIndexedSeq
 
       object Serializer extends NegotiatedSerializer[MockRequestEntity, ByteString] {
         override def protocol =
@@ -42,7 +51,7 @@ object MockRequestEntity {
         new NegotiatedDeserializer[MockRequestEntity, ByteString] {
           override def deserialize(wire: ByteString) = wire.utf8String.split(":") match {
             case Array(field1, field2) if field2.matches("-?\\d+") => MockRequestEntity(field1, field2.toInt)
-            case other => throw DeserializationException("Bad request")
+            case other                                             => throw DeserializationException("Bad request")
           }
         }
 
@@ -56,7 +65,6 @@ object MockResponseEntity {
 }
 
 trait MockService extends Service {
-
   def mockCall(id: Long): ServiceCall[MockRequestEntity, MockResponseEntity]
   def doNothing: ServiceCall[NotUsed, NotUsed]
   def alwaysFail: ServiceCall[NotUsed, NotUsed]
@@ -74,6 +82,7 @@ trait MockService extends Service {
   def listResults: ServiceCall[MockRequestEntity, List[MockResponseEntity]]
   def customContentType: ServiceCall[MockRequestEntity, MockResponseEntity]
   def noContentType: ServiceCall[MockRequestEntity, MockResponseEntity]
+  def echoByteString: ServiceCall[ByteString, ByteString]
 
   override def descriptor = {
     named("mockservice").withCalls(
@@ -92,19 +101,25 @@ trait MockService extends Service {
       call(streamServiceName _),
       pathCall("/queryparam?qp", queryParamId _),
       call(listResults _),
-      call(customContentType _)(MockRequestEntity.customSerializer(Some("application/mock-request-entity")), implicitly[MessageSerializer[MockResponseEntity, _]]),
-      call(noContentType _)(MockRequestEntity.customSerializer(None), implicitly[MessageSerializer[MockResponseEntity, _]])
+      call(customContentType _)(
+        MockRequestEntity.customSerializer(Some("application/mock-request-entity")),
+        implicitly[MessageSerializer[MockResponseEntity, _]]
+      ),
+      call(noContentType _)(
+        MockRequestEntity.customSerializer(None),
+        implicitly[MessageSerializer[MockResponseEntity, _]]
+      ),
+      call(echoByteString _)
     )
   }
 }
 
 object MockService {
-  val invoked = new AtomicBoolean
+  val invoked       = new AtomicBoolean
   val firstReceived = new AtomicReference[MockRequestEntity]()
 }
 
 class MockServiceImpl(implicit mat: Materializer, ec: ExecutionContext) extends MockService {
-
   override def mockCall(id: Long) = ServiceCall { req =>
     Future.successful(MockResponseEntity(id, req))
   }
@@ -124,11 +139,15 @@ class MockServiceImpl(implicit mat: Materializer, ec: ExecutionContext) extends 
   }
 
   override def streamResponse = ServiceCall { req =>
-    Future.successful(Source(1 to 3).map { i => MockResponseEntity(i, req) })
+    Future.successful(Source(1 to 3).map { i =>
+      MockResponseEntity(i, req)
+    })
   }
 
   override def unitStreamResponse = ServiceCall { _ =>
-    Future.successful(Source(1 to 3).map { i => MockResponseEntity(i, MockRequestEntity("entity", i)) })
+    Future.successful(Source(1 to 3).map { i =>
+      MockResponseEntity(i, MockRequestEntity("entity", i))
+    })
   }
 
   override def streamRequest = ServiceCall { stream =>
@@ -177,8 +196,8 @@ class MockServiceImpl(implicit mat: Materializer, ec: ExecutionContext) extends 
     Future.successful(query.getOrElse("none"))
   }
 
-  override def listResults = ServiceCall { req =>
-    Future.successful((for (i <- 1 to req.field2) yield MockResponseEntity(i, req)).to[List])
+  override def listResults: ServiceCall[MockRequestEntity, List[MockResponseEntity]] = ServiceCall { req =>
+    Future.successful((for (i <- 1 to req.field2) yield MockResponseEntity(i, req)).toList)
   }
 
   override def customContentType = ServiceCall { req =>
@@ -189,7 +208,13 @@ class MockServiceImpl(implicit mat: Materializer, ec: ExecutionContext) extends 
     Future.successful(MockResponseEntity(req.field2, req))
   }
 
-  private def withServiceName[Request, Response](block: String => ServerServiceCall[Request, Response]): ServerServiceCall[Request, Response] = {
+  override def echoByteString = ServiceCall { req =>
+    Future.successful(req)
+  }
+
+  private def withServiceName[Request, Response](
+      block: String => ServerServiceCall[Request, Response]
+  ): ServerServiceCall[Request, Response] = {
     ServerServiceCall.compose { requestHeader =>
       val serviceName = requestHeader.principal.map(_.getName).getOrElse {
         throw NotFound("principal")

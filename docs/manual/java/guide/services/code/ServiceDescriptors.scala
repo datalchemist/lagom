@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.services
 
 import java.util.concurrent.TimeUnit
@@ -11,7 +15,6 @@ import docs.services.FirstDescriptor._
 import scala.concurrent.Future
 
 class ServiceDescriptorsSpec extends ServiceSupport {
-
   "Service descriptors documentation" should {
     "show a hello service" in withServiceInstance[HelloService](new HelloService {
       override def sayHello(): ServiceCall[String, String] = serviceCall { name =>
@@ -48,8 +51,12 @@ class ServiceDescriptorsSpec extends ServiceSupport {
     }
 
     "show configuring rest calls" in withServiceInstance[CallRest](new CallRest {
-      override def addItem(orderId: Long): ServiceCall[Item, NotUsed] = serviceCall { _ => ??? }
-      override def deleteItem(orderId: Long, itemId: String): ServiceCall[NotUsed, NotUsed] = serviceCall { _ => ???}
+      override def addItem(orderId: Long): ServiceCall[Item, NotUsed] = serviceCall { _ =>
+        ???
+      }
+      override def deleteItem(orderId: Long, itemId: String): ServiceCall[NotUsed, NotUsed] = serviceCall { _ =>
+        ???
+      }
       override def getItem(orderId: Long, itemId: String): ServiceCall[NotUsed, Item] = serviceCall { _ =>
         Future.successful(Item.of(itemId, orderId))
       }
@@ -58,7 +65,5 @@ class ServiceDescriptorsSpec extends ServiceSupport {
       item.id should ===("foo")
       item.orderId should ===(10)
     }
-
   }
-
 }

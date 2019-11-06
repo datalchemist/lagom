@@ -1,18 +1,23 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.client
 
 import com.lightbend.lagom.scaladsl.api.broker.Topic.TopicId
-import com.lightbend.lagom.scaladsl.api.broker.{ Subscriber, Topic }
-import com.lightbend.lagom.scaladsl.api.{ Descriptor, Service, ServiceCall }
-import org.scalatest.{ Inside, Matchers, WordSpec }
+import com.lightbend.lagom.scaladsl.api.broker.Subscriber
+import com.lightbend.lagom.scaladsl.api.broker.Topic
+import com.lightbend.lagom.scaladsl.api.Descriptor
+import com.lightbend.lagom.scaladsl.api.Service
+import com.lightbend.lagom.scaladsl.api.ServiceCall
+import org.scalatest.Inside
+import org.scalatest.Matchers
+import org.scalatest.WordSpec
 
 import scala.collection.immutable
 import scala.concurrent.Future
 
 class ServiceClientSpec extends WordSpec with Matchers with Inside {
-
   "The service client macro" should {
     "allow implementing a service client" in {
       val mockServiceClient = TestServiceClient.implement[MockService]
@@ -83,7 +88,6 @@ class ServiceClientSpec extends WordSpec with Matchers with Inside {
       }
     }
   }
-
 }
 
 trait MockService extends Service {
@@ -100,26 +104,30 @@ trait MockService extends Service {
   def streamNoArgumentsRef(): Topic[String]
 
   import Service._
-  override def descriptor: Descriptor = named("mockservice").withCalls(
-    call(noParamListRef _),
-    call(noParamList),
-    call(noArgumentsRef _),
-    call(noArguments()),
-    pathCall("/one/:arg", oneArgument _),
-    pathCall("/two/:arg1/:arg2", twoArguments _)
-  ).withTopics(
-      topic("someid1", streamNoParamList),
-      topic("someid2", streamNoParamListRef _),
-      topic("someid3", streamNoArguments()),
-      topic("someid4", streamNoArgumentsRef _)
-    )
+  override def descriptor: Descriptor =
+    named("mockservice")
+      .withCalls(
+        call(noParamListRef _),
+        call(noParamList),
+        call(noArgumentsRef _),
+        call(noArguments()),
+        pathCall("/one/:arg", oneArgument _),
+        pathCall("/two/:arg1/:arg2", twoArguments _)
+      )
+      .withTopics(
+        topic("someid1", streamNoParamList),
+        topic("someid2", streamNoParamListRef _),
+        topic("someid3", streamNoArguments()),
+        topic("someid4", streamNoArgumentsRef _)
+      )
 }
 
-case class TestServiceCall[Request, Response](descriptor: Descriptor, methodName: String, params: Seq[Any]) extends ServiceCall[Request, Response] {
+case class TestServiceCall[Request, Response](descriptor: Descriptor, methodName: String, params: Seq[Any])
+    extends ServiceCall[Request, Response] {
   override def invoke(request: Request): Future[Response] = null
 }
 
 case class TestTopic[Message](descriptor: Descriptor, methodName: String) extends Topic[Message] {
-  override def topicId: TopicId = null
+  override def topicId: TopicId               = null
   override def subscribe: Subscriber[Message] = null
 }

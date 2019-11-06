@@ -1,10 +1,14 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.home.serialization;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.lightbend.lagom.javadsl.immutable.ImmutableStyle;
 import org.immutables.value.Value;
 
-//#compressed-jsonable
+// #compressed-jsonable
 import com.lightbend.lagom.serialization.CompressedJsonable;
 
 @Value.Immutable
@@ -16,4 +20,4 @@ public interface AbstractAuthor extends CompressedJsonable {
 
   String biography();
 }
-//#compressed-jsonable
+// #compressed-jsonable

@@ -1,15 +1,18 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.client.compile
 
-import com.lightbend.lagom.scaladsl.api.{ Service, ServiceCall }
-import com.lightbend.lagom.scaladsl.client.{ ServiceClient, ServiceClientConstructor, ServiceClientImplementationContext }
+import com.lightbend.lagom.scaladsl.api.Service
+import com.lightbend.lagom.scaladsl.api.ServiceCall
+import com.lightbend.lagom.scaladsl.client.ServiceClient
+import com.lightbend.lagom.scaladsl.client.ServiceClientConstructor
+import com.lightbend.lagom.scaladsl.client.ServiceClientImplementationContext
 import com.lightbend.lagom.macrotestkit.ShouldNotTypecheck
 import Service._
 
 object ServiceClientMacroErrors {
-
   ShouldNotTypecheck(
     "Abstract non service call check",
     "MacroErrorsServiceClient.implement[AbstractNonServiceCall]",
@@ -27,7 +30,6 @@ object ServiceClientMacroErrors {
     "MacroErrorsServiceClient.implement[OverloadedMethods]",
     ".*overloaded methods are: foo.*"
   )
-
 }
 
 object MacroErrorsServiceClient extends ServiceClientConstructor {
@@ -40,8 +42,7 @@ trait AbstractNonServiceCall extends Service {
   override def descriptor = named("foo")
 }
 
-trait AbstractDescriptor extends Service {
-}
+trait AbstractDescriptor extends Service {}
 
 trait OverloadedMethods extends Service {
   def foo(arg: String): ServiceCall[String, String]

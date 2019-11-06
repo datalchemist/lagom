@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.server
 
 import com.lightbend.lagom.scaladsl.api.ServiceCall
@@ -12,8 +13,8 @@ import scala.concurrent.Future
  * A service call implementation that allows plugging directly into Play's request handling.
  */
 trait PlayServiceCall[Request, Response] extends ServiceCall[Request, Response] {
-
-  def invoke(request: Request): Future[Response] = throw new UnsupportedOperationException("Play service call must be invoked using Play specific methods")
+  def invoke(request: Request): Future[Response] =
+    throw new UnsupportedOperationException("Play service call must be invoked using Play specific methods")
 
   /**
    * Low level hook for implementing service calls directly in Play.
@@ -31,7 +32,6 @@ trait PlayServiceCall[Request, Response] extends ServiceCall[Request, Response] 
 }
 
 object PlayServiceCall {
-
   /**
    * Convenience function for creating Play service calls.
    *
@@ -60,10 +60,12 @@ object PlayServiceCall {
    * }
    * ```
    */
-  def apply[Request, Response](serviceCall: (ServiceCall[Request, Response] => EssentialAction) => EssentialAction): PlayServiceCall[Request, Response] = {
+  def apply[Request, Response](
+      serviceCall: (ServiceCall[Request, Response] => EssentialAction) => EssentialAction
+  ): PlayServiceCall[Request, Response] = {
     new PlayServiceCall[Request, Response] {
-      override def invoke(wrapCall: (ServiceCall[Request, Response]) => EssentialAction): EssentialAction = serviceCall(wrapCall)
+      override def invoke(wrapCall: (ServiceCall[Request, Response]) => EssentialAction): EssentialAction =
+        serviceCall(wrapCall)
     }
   }
-
 }

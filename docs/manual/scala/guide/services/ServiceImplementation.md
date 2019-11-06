@@ -6,13 +6,13 @@ For example, here's an implementation of the `HelloService` descriptor:
 
 @[hello-service-impl](code/ServiceImplementation.scala)
 
-As you can see, the `sayHello` method is implemented using the `apply` factory method on [`ServiceCall`](api/com/lightbend/lagom/scaladsl/api/ServiceCall$.html). This takes a function of `Request => Future[Response]` and returns a [`ServiceCall`](api/com/lightbend/lagom/scaladsl/api/ServiceCall.html) whose `invoke` method simply delegates to that function.  An important thing to realise here is that the invocation of `sayHello` itself does not execute the call, it only returns the service call to be executed.  The advantage here is that when it comes to composing the call with other cross cutting concerns, such as authentication, this can easily be done using ordinary function based composition.
+As you can see, the `sayHello` method is implemented using the `apply` factory method on [`ServiceCall`](api/com/lightbend/lagom/scaladsl/api/ServiceCall$.html). This takes a function of `Request => Future[Response]` and returns a [`ServiceCall`](api/com/lightbend/lagom/scaladsl/api/ServiceCall.html) whose `invoke` method simply delegates to that function.  An important thing to realize here is that the invocation of `sayHello` itself does not execute the call, it only returns the service call to be executed.  The advantage here is that when it comes to composing the call with other cross cutting concerns, such as authentication, this can easily be done using ordinary function based composition.
 
 Let's have a look at our [`ServiceCall`](api/com/lightbend/lagom/scaladsl/api/ServiceCall.html) interface again:
 
 @[service-call](code/ServiceDescriptors.scala)
 
-It will take the request, and return the response as a [`Future`](http://www.scala-lang.org/api/2.12.x/scala/concurrent/Future.html).  If you've never seen `Future` before, it is a value that may not be available until later.  When an API returns a future, that value might not yet be computed, but the API promises that at some point in future, it will be.  Since the value isn't computed yet, you can't interact with it immediately.  What you can do though is attach callbacks that transform the promise to a promise of a new value, using the `map` and `flatMap` methods.  `Future` with its `map` and `flatMap` methods are fundamental building blocks for doing reactive programming in Scala, they allow your code to be asynchronous, not waiting for things to happen, but attaching callbacks that react to computations being completed.
+It will take the request, and return the response as a [`Future`](https://www.scala-lang.org/api/2.12.x/scala/concurrent/Future.html).  If you've never seen `Future` before, it is a value that may not be available until later.  When an API returns a future, that value might not yet be computed, but the API promises that at some point in future, it will be.  Since the value isn't computed yet, you can't interact with it immediately.  What you can do though is attach callbacks that transform the promise to a promise of a new value, using the `map` and `flatMap` methods.  `Future` with its `map` and `flatMap` methods are fundamental building blocks for doing reactive programming in Scala, they allow your code to be asynchronous, not waiting for things to happen, but attaching callbacks that react to computations being completed.
 
 Of course, a simple hello world computation is not asynchronous, all it needs to do is build a String, and that returns immediately.  In this case, we need to wrap the result of that in a `Future`.  This can be done by calling `Future.successful()`, which returns a future that has an immediately available value.
 
@@ -45,6 +45,8 @@ The [`ServerServiceCall`](api/com/lightbend/lagom/scaladsl/server/ServerServiceC
 Here's an example of working with the headers:
 
 @[server-service-call](code/ServiceImplementation.scala)
+
+
 
 ## Service call composition
 

@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.api.broker
 
 /**
@@ -58,7 +59,8 @@ object Message {
     MessageImpl(payload, Map.empty)
   }
 
-  private case class MessageImpl[Payload](payload: Payload, metadataMap: Map[MetadataKey[_], _]) extends Message[Payload] {
+  private case class MessageImpl[Payload](payload: Payload, metadataMap: Map[MetadataKey[_], _])
+      extends Message[Payload] {
     override def get[Metadata](key: MetadataKey[Metadata]): Option[Metadata] = {
       metadataMap.get(key).asInstanceOf[Option[Metadata]]
     }
@@ -81,7 +83,6 @@ sealed trait MetadataKey[Metadata] {
 }
 
 object MetadataKey {
-
   /**
    * Create a metadata key with the given name.
    */

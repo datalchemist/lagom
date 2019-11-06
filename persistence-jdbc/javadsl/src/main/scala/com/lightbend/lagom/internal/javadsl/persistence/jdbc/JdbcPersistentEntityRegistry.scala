@@ -1,25 +1,28 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.javadsl.persistence.jdbc
 
-import javax.inject.{ Inject, Singleton }
+import java.util.Optional
 
+import javax.inject.Inject
+import javax.inject.Singleton
 import akka.actor.ActorSystem
 import akka.persistence.jdbc.query.scaladsl.JdbcReadJournal
-import akka.persistence.query.scaladsl.EventsByTagQuery
-import akka.persistence.query.{ NoOffset, PersistenceQuery, Sequence, Offset => AkkaOffset }
-import com.google.inject.Injector
 import com.lightbend.lagom.internal.javadsl.persistence.AbstractPersistentEntityRegistry
-import com.lightbend.lagom.javadsl.persistence.{ Offset, PersistentEntity }
+import com.lightbend.lagom.javadsl.persistence.PersistentEntity
+import play.api.inject.Injector
 
 /**
  * INTERNAL API
  */
 @Singleton
-private[lagom] final class JdbcPersistentEntityRegistry @Inject() (system: ActorSystem, injector: Injector, slickProvider: SlickProvider)
-  extends AbstractPersistentEntityRegistry(system, injector) {
-
+private[lagom] final class JdbcPersistentEntityRegistry @Inject() (
+    system: ActorSystem,
+    injector: Injector,
+    slickProvider: SlickProvider
+) extends AbstractPersistentEntityRegistry(system, injector) {
   private lazy val ensureTablesCreated = slickProvider.ensureTablesCreated()
 
   override def register[C, E, S](entityClass: Class[_ <: PersistentEntity[C, E, S]]): Unit = {
@@ -27,8 +30,5 @@ private[lagom] final class JdbcPersistentEntityRegistry @Inject() (system: Actor
     super.register(entityClass)
   }
 
-  override protected val journalId: String = JdbcReadJournal.Identifier
-  private val jdbcReadJournal = PersistenceQuery(system).readJournalFor[JdbcReadJournal](journalId)
-  override protected val eventsByTagQuery: Option[EventsByTagQuery] = Some(jdbcReadJournal)
-
+  protected override val queryPluginId = Optional.of(JdbcReadJournal.Identifier)
 }

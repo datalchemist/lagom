@@ -1,6 +1,11 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.scaladsl.logging
 
-import org.apache.logging.log4j.{ LogManager, Logger }
+import org.apache.logging.log4j.LogManager
+import org.apache.logging.log4j.Logger
 
 object Log4j2Example {
   private final val Logger: Logger = LogManager.getLogger

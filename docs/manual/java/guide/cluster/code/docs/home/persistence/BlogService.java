@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.home.persistence;
 
 import com.lightbend.lagom.javadsl.api.*;
@@ -11,8 +15,6 @@ public interface BlogService extends Service {
 
   @Override
   default Descriptor descriptor() {
-    return named("/blogservice").withCalls(
-      restCall(Method.POST, "/blogs/:id", this::addPost)
-    );
+    return named("/blogservice").withCalls(restCall(Method.POST, "/blogs/:id", this::addPost));
   }
 }

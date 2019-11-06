@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.api.tools.tests.javadsl;
 
 import akka.NotUsed;
@@ -14,11 +15,9 @@ import static com.lightbend.lagom.javadsl.api.Service.restCall;
 
 public interface NoAclService extends Service {
 
-    ServiceCall<NotUsed, NotUsed> getMock(String id);
+  ServiceCall<NotUsed, NotUsed> getMock(String id);
 
-    default Descriptor descriptor() {
-        return named("/noaclservice").withCalls(
-            restCall(Method.GET,  "/mocks/:id", this::getMock)
-        );
-    }
+  default Descriptor descriptor() {
+    return named("/noaclservice").withCalls(restCall(Method.GET, "/mocks/:id", this::getMock));
+  }
 }

@@ -1,13 +1,13 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.persistence
 
 class NamedEntity() extends PersistentEntity {
-
   override type Command = String
-  override type Event = String
-  override type State = String
+  override type Event   = String
+  override type State   = String
 
   override def entityTypeName: String = "some-name"
 

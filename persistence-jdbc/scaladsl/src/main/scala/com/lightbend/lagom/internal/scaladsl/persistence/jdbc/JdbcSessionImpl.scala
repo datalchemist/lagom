@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.scaladsl.persistence.jdbc
 
 import java.sql.Connection
@@ -14,7 +15,6 @@ import scala.concurrent.Future
  * INTERNAL API
  */
 final class JdbcSessionImpl(slick: SlickProvider) extends JdbcSession {
-
   import slick.profile.api._
 
   override def withConnection[T](block: Connection => T): Future[T] = {
@@ -32,5 +32,4 @@ final class JdbcSessionImpl(slick: SlickProvider) extends JdbcSession {
       }.transactionally
     }
   }
-
 }

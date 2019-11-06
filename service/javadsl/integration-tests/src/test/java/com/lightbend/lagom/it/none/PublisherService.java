@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.it.none;
 
 import com.lightbend.lagom.javadsl.api.Descriptor;
@@ -11,13 +12,11 @@ import static com.lightbend.lagom.javadsl.api.Service.named;
 
 public interface PublisherService extends Service {
 
-    Topic<String> messages();
+  Topic<String> messages();
 
-    String TOPIC = "the-topic";
+  String TOPIC = "the-topic";
 
-    default Descriptor descriptor() {
-        return named("/publisher").withTopics(
-                Service.topic(TOPIC, this::messages)
-        );
-    }
+  default Descriptor descriptor() {
+    return named("/publisher").withTopics(Service.topic(TOPIC, this::messages));
+  }
 }

@@ -1,13 +1,16 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.broker
 
 import akka.persistence.query.Offset
 import akka.stream.scaladsl.Source
 import com.lightbend.internal.broker.TaggedOffsetTopicProducer
 import com.lightbend.lagom.scaladsl.api.broker.Topic
-import com.lightbend.lagom.scaladsl.persistence.{ AggregateEvent, AggregateEventShards, AggregateEventTag }
+import com.lightbend.lagom.scaladsl.persistence.AggregateEvent
+import com.lightbend.lagom.scaladsl.persistence.AggregateEventShards
+import com.lightbend.lagom.scaladsl.persistence.AggregateEventTag
 
 import scala.collection.immutable
 
@@ -48,7 +51,7 @@ object TopicProducer {
    * @return The topic producer.
    */
   def taggedStreamWithOffset[Message, Event <: AggregateEvent[Event]](tags: immutable.Seq[AggregateEventTag[Event]])(
-    eventStream: (AggregateEventTag[Event], Offset) => Source[(Message, Offset), Any]
+      eventStream: (AggregateEventTag[Event], Offset) => Source[(Message, Offset), Any]
   ): Topic[Message] =
     new TaggedOffsetTopicProducer[Message, Event](tags, eventStream)
 
@@ -66,8 +69,7 @@ object TopicProducer {
    * @return The topic producer.
    */
   def taggedStreamWithOffset[Message, Event <: AggregateEvent[Event]](shards: AggregateEventShards[Event])(
-    eventStream: (AggregateEventTag[Event], Offset) => Source[(Message, Offset), Any]
+      eventStream: (AggregateEventTag[Event], Offset) => Source[(Message, Offset), Any]
   ): Topic[Message] =
     new TaggedOffsetTopicProducer[Message, Event](shards.allTags.toList, eventStream)
-
 }

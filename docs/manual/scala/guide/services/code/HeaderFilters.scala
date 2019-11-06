@@ -1,9 +1,15 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.scaladsl.services.headerfilters
 
 package compose {
-
-  import com.lightbend.lagom.scaladsl.api.transport.{HeaderFilter, RequestHeader, ResponseHeader}
-  import com.lightbend.lagom.scaladsl.api.{Service, ServiceCall}
+  import com.lightbend.lagom.scaladsl.api.transport.HeaderFilter
+  import com.lightbend.lagom.scaladsl.api.transport.RequestHeader
+  import com.lightbend.lagom.scaladsl.api.transport.ResponseHeader
+  import com.lightbend.lagom.scaladsl.api.Service
+  import com.lightbend.lagom.scaladsl.api.ServiceCall
   import org.slf4j.LoggerFactory
 
   //#verbose-filter
@@ -20,16 +26,12 @@ package compose {
       request
     }
 
-    def transformServerResponse(response: ResponseHeader,
-      request: RequestHeader) = {
-
+    def transformServerResponse(response: ResponseHeader, request: RequestHeader) = {
       log.debug(name + " - transforming Server Response")
       response
     }
 
-    def transformClientResponse(response: ResponseHeader,
-      request: RequestHeader) = {
-
+    def transformClientResponse(response: ResponseHeader, request: RequestHeader) = {
       log.debug(name + " - transforming Client Response")
       response
     }
@@ -42,14 +44,17 @@ package compose {
     //#header-filter-composition
     def descriptor = {
       import Service._
-      named("hello").withCalls(
-        call(sayHello)
-      ).withHeaderFilter(HeaderFilter.composite(
-        new VerboseFilter("Foo"),
-        new VerboseFilter("Bar")
-      ))
+      named("hello")
+        .withCalls(
+          call(sayHello)
+        )
+        .withHeaderFilter(
+          HeaderFilter.composite(
+            new VerboseFilter("Foo"),
+            new VerboseFilter("Bar")
+          )
+        )
     }
     //#header-filter-composition
   }
 }
-

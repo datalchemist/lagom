@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.home.scaladsl.persistence
 
 //#imports
@@ -14,12 +18,10 @@ import com.lightbend.lagom.scaladsl.persistence.jdbc.JdbcSession.tryWith
 //#imports
 
 trait JdbcBlogEventProcessor {
-
   trait Initial {
     //#initial
     class BlogEventProcessor(readSide: JdbcReadSide)(implicit ec: ExecutionContext)
-      extends ReadSideProcessor[BlogEvent] {
-
+        extends ReadSideProcessor[BlogEvent] {
       override def buildHandler(): ReadSideProcessor.ReadSideHandler[BlogEvent] = {
         // TODO build read side handler
         ???
@@ -33,9 +35,7 @@ trait JdbcBlogEventProcessor {
     //#initial
   }
 
-  class BlogEventProcessor(readSide: JdbcReadSide)
-    extends ReadSideProcessor[BlogEvent] {
-
+  class BlogEventProcessor(readSide: JdbcReadSide) extends ReadSideProcessor[BlogEvent] {
     //#tag
     override def aggregateTags: Set[AggregateEventTag[BlogEvent]] =
       BlogEvent.Tag.allTags
@@ -43,18 +43,20 @@ trait JdbcBlogEventProcessor {
 
     //#create-table
     private def createTable(connection: Connection): Unit = {
-      tryWith(connection.prepareStatement("CREATE TABLE IF NOT EXISTS blogsummary ( " +
-        "id VARCHAR(64), title VARCHAR(256), PRIMARY KEY (id))")) { ps =>
+      tryWith(
+        connection.prepareStatement(
+          "CREATE TABLE IF NOT EXISTS blogsummary ( " +
+            "id VARCHAR(64), title VARCHAR(256), PRIMARY KEY (id))"
+        )
+      ) { ps =>
         ps.execute()
       }
     }
     //#create-table
 
     //#post-added
-    private def processPostAdded(connection: Connection,
-      eventElement: EventStreamElement[PostAdded]): Unit = {
-      tryWith(connection.prepareStatement(
-        "INSERT INTO blogsummary (id, title) VALUES (?, ?)")) { statement =>
+    private def processPostAdded(connection: Connection, eventElement: EventStreamElement[PostAdded]): Unit = {
+      tryWith(connection.prepareStatement("INSERT INTO blogsummary (id, title) VALUES (?, ?)")) { statement =>
         statement.setString(1, eventElement.event.postId)
         statement.setString(2, eventElement.event.content.title)
         statement.execute()
@@ -80,5 +82,4 @@ trait JdbcBlogEventProcessor {
       //#build
     }
   }
-
 }

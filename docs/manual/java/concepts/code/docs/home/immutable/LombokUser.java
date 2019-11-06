@@ -1,8 +1,12 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.home.immutable;
 
 import lombok.Value;
 
-//#lombok-immutable
+// #lombok-immutable
 @Value
 public class LombokUser {
 
@@ -10,4 +14,4 @@ public class LombokUser {
 
   String email;
 }
-//#lombok-immutable
+// #lombok-immutable

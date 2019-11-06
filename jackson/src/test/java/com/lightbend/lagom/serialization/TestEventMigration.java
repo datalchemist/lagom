@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.serialization;
 
 import com.fasterxml.jackson.databind.node.IntNode;
@@ -8,7 +9,9 @@ import com.fasterxml.jackson.databind.node.IntNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.JsonNode;
 
-public class TestEventMigration extends JacksonJsonMigration {
+import akka.serialization.jackson.JacksonMigration;
+
+public class TestEventMigration extends JacksonMigration {
 
   @Override
   public int currentVersion() {
@@ -28,5 +31,4 @@ public class TestEventMigration extends JacksonJsonMigration {
     root.set("field2", IntNode.valueOf(17));
     return root;
   }
-
 }

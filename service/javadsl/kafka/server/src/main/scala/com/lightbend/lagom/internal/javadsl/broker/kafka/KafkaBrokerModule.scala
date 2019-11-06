@@ -1,14 +1,16 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.javadsl.broker.kafka
 
-import com.google.inject.AbstractModule
+import play.api.Configuration
+import play.api.Environment
+import play.api.inject.Binding
+import play.api.inject.Module
 
-class KafkaBrokerModule extends AbstractModule {
-
-  override def configure(): Unit = {
-    bind(classOf[JavadslRegisterTopicProducers]).asEagerSingleton()
-  }
-
+class KafkaBrokerModule extends Module {
+  override def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] = Seq(
+    bind[JavadslRegisterTopicProducers].toSelf.eagerly()
+  )
 }

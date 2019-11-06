@@ -1,38 +1,42 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.scaladsl.persistence.cassandra
 
 import akka.persistence.query.Offset
 import akka.stream.ActorAttributes
 import akka.stream.scaladsl.Flow
-import akka.{ Done, NotUsed }
-import com.datastax.driver.core.{ BatchStatement, BoundStatement }
-import com.lightbend.lagom.internal.persistence.cassandra.{ CassandraOffsetDao, CassandraOffsetStore }
+import akka.Done
+import akka.NotUsed
+import com.datastax.driver.core.BatchStatement
+import com.datastax.driver.core.BoundStatement
+import com.lightbend.lagom.internal.persistence.cassandra.CassandraOffsetDao
+import com.lightbend.lagom.internal.persistence.cassandra.CassandraOffsetStore
 import com.lightbend.lagom.scaladsl.persistence.ReadSideProcessor.ReadSideHandler
 import com.lightbend.lagom.scaladsl.persistence._
 import com.lightbend.lagom.scaladsl.persistence.cassandra.CassandraSession
 import org.slf4j.LoggerFactory
 
 import scala.collection.immutable
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 import scala.collection.JavaConverters._
 
 /**
  * Internal API
  */
 private[cassandra] abstract class CassandraReadSideHandler[Event <: AggregateEvent[Event], Handler](
-  session:    CassandraSession,
-  handlers:   Map[Class[_ <: Event], Handler],
-  dispatcher: String
-)(implicit ec: ExecutionContext) extends ReadSideHandler[Event] {
-
+    session: CassandraSession,
+    handlers: Map[Class[_ <: Event], Handler],
+    dispatcher: String
+)(implicit ec: ExecutionContext)
+    extends ReadSideHandler[Event] {
   private val log = LoggerFactory.getLogger(this.getClass)
 
   protected def invoke(handler: Handler, event: EventStreamElement[Event]): Future[immutable.Seq[BoundStatement]]
 
   override def handle(): Flow[EventStreamElement[Event], Done, NotUsed] = {
-
     def executeStatements(statements: Seq[BoundStatement]): Future[Done] = {
       val batch = new BatchStatement
       // statements is never empty, there is at least the store offset statement
@@ -43,7 +47,6 @@ private[cassandra] abstract class CassandraReadSideHandler[Event <: AggregateEve
 
     Flow[EventStreamElement[Event]]
       .mapAsync(parallelism = 1) { elem =>
-
         val eventClass = elem.event.getClass
 
         val handler =
@@ -58,8 +61,8 @@ private[cassandra] abstract class CassandraReadSideHandler[Event <: AggregateEve
           )
 
         invoke(handler, elem).flatMap(executeStatements)
-
-      }.withAttributes(ActorAttributes.dispatcher(dispatcher))
+      }
+      .withAttributes(ActorAttributes.dispatcher(dispatcher))
   }
 }
 
@@ -67,7 +70,6 @@ private[cassandra] abstract class CassandraReadSideHandler[Event <: AggregateEve
  * Internal API
  */
 private[cassandra] object CassandraAutoReadSideHandler {
-
   type Handler[Event] = (EventStreamElement[_ <: Event]) => Future[immutable.Seq[BoundStatement]]
 
   def emptyHandler[Event]: Handler[Event] =
@@ -78,24 +80,28 @@ private[cassandra] object CassandraAutoReadSideHandler {
  * Internal API
  */
 private[cassandra] final class CassandraAutoReadSideHandler[Event <: AggregateEvent[Event]](
-  session:               CassandraSession,
-  offsetStore:           CassandraOffsetStore,
-  handlers:              Map[Class[_ <: Event], CassandraAutoReadSideHandler.Handler[Event]],
-  globalPrepareCallback: () => Future[Done],
-  prepareCallback:       AggregateEventTag[Event] => Future[Done],
-  readProcessorId:       String,
-  dispatcher:            String
+    session: CassandraSession,
+    offsetStore: CassandraOffsetStore,
+    handlers: Map[Class[_ <: Event], CassandraAutoReadSideHandler.Handler[Event]],
+    globalPrepareCallback: () => Future[Done],
+    prepareCallback: AggregateEventTag[Event] => Future[Done],
+    readProcessorId: String,
+    dispatcher: String
 )(implicit ec: ExecutionContext)
-  extends CassandraReadSideHandler[Event, CassandraAutoReadSideHandler.Handler[Event]](
-    session, handlers, dispatcher
-  ) {
-
+    extends CassandraReadSideHandler[Event, CassandraAutoReadSideHandler.Handler[Event]](
+      session,
+      handlers,
+      dispatcher
+    ) {
   import CassandraAutoReadSideHandler.Handler
 
   @volatile
   private var offsetDao: CassandraOffsetDao = _
 
-  override protected def invoke(handler: Handler[Event], element: EventStreamElement[Event]): Future[immutable.Seq[BoundStatement]] = {
+  protected override def invoke(
+      handler: Handler[Event],
+      element: EventStreamElement[Event]
+  ): Future[immutable.Seq[BoundStatement]] = {
     for {
       statements <- handler
         .asInstanceOf[EventStreamElement[Event] => Future[immutable.Seq[BoundStatement]]]
@@ -112,7 +118,7 @@ private[cassandra] final class CassandraAutoReadSideHandler[Event <: AggregateEv
 
   override def prepare(tag: AggregateEventTag[Event]): Future[Offset] = {
     for {
-      _ <- prepareCallback.apply(tag)
+      _   <- prepareCallback.apply(tag)
       dao <- offsetStore.prepare(readProcessorId, tag.tag)
     } yield {
       offsetDao = dao

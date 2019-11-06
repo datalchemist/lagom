@@ -22,7 +22,7 @@ Lagom allows this by allowing you to configure a partition key strategy, which e
 
 ## Implementing a topic
 
-The primary source of messages that Lagom is designed to produce is persistent entity events. Rather than publishing events in an ad-hoc fashion in response to particular things happen, it is better to take the stream of events from your persistent entities, and adapt that to a stream of messages sent to the message broker. In this way, you can ensure at least once processing of events by both publishers and consumers, which allows you to guarantee a very strong level of consistency throughout your system.
+The primary source of messages that Lagom is designed to produce is persistent entity events. Rather than publishing events in an ad-hoc fashion in response to particular things happening, it is better to take the stream of events from your persistent entities, and adapt that to a stream of messages sent to the message broker. In this way, you can ensure at least once processing of events by both publishers and consumers, which allows you to guarantee a very strong level of consistency throughout your system.
 
 Lagom's [`TopicProducer`](api/com/lightbend/lagom/scaladsl/broker/TopicProducer$.html) helper provides two methods for publishing a persistent entities event stream, [`singleStreamWithOffset`](api/com/lightbend/lagom/scaladsl/broker/TopicProducer$.html) for use with non sharded read side event streams, and [`taggedStreamWithOffset`](api/com/lightbend/lagom/scaladsl/broker/TopicProducer$.html) for use with sharded read side event streams.  Both of these methods take a callback which takes the last offset that the topic producer published, and allows resumption of the event stream from that offset via the [`PersistentEntityRegistry.eventStream`](api/com/lightbend/lagom/scaladsl/persistence/PersistentEntityRegistry.html) method for obtaining a read-side stream. For more details on read-side streams, see [[Persistent Read-Side's|ReadSide#Raw-Stream-of-Events]].
 
@@ -32,7 +32,15 @@ Here's an example of publishing a single, non sharded event stream:
 
 @[implement-topic](code/docs/scaladsl/mb/HelloServiceImpl.scala)
 
-Note that the read-side event stream you passed to the topic producer is "activated" as soon as the service is started. That means all events persisted by your services will eventually be published to the connected topic. Also, you will generally want to map your domain events into some other type, so that other service won't be tightly coupled to another service's domain model events. In other words, domain model events are an implementation detail of the service, and should not be leaked.
+Note that the read-side event stream you passed to the topic producer is "activated" as soon as the service is started. That means that in the previous example, all events persisted by your services will eventually be published to the connected topic. Also, you will generally want to map your domain events into some other type, so that other service won't be tightly coupled to another service's domain model events. In other words, domain model events are an implementation detail of the service, and should not be leaked.
+
+### Filtering events
+
+You may not want all events persisted by your services to be published. If that is the case then you can filter the event stream:
+
+@[filter-events](code/docs/scaladsl/mb/FilteredServiceImpl.scala)
+
+When an event is filtered, the `TopicProducer` does not publish the event. It also does not advance the offset. If the `TopicProducer` restarts then it will resume from the last offset. If a large number of events are filtered then the last offset could be quite far behind, and so all those events will be reprocessed and filtered out again. You need to be aware that this may occur and keep the number of consecutively filtered elements relatively low and also minimize the time and resources required to perform the filtering.
 
 ### Offset storage
 
@@ -55,6 +63,14 @@ Your broker implementation may provide additional metadata with messages which y
 @[subscribe-to-topic-with-metadata](code/docs/scaladsl/mb/AnotherServiceImpl.scala)
 
 The [`messageKeyAsString`](api/com/lightbend/lagom/scaladsl/api/broker/Message.html#messageKeyAsString:String) method is provided as a convenience for accessing the message key. Other properties can be accessed using the [`get`](api/com/lightbend/lagom/scaladsl/api/broker/Message.html#get\(com.lightbend.lagom.scaladsl.api.broker.MetadataKey[Metadata]\):Metadata) method. A full list of the metadata keys available for Kafka can be found [here](api/com/lightbend/lagom/scaladsl/broker/kafka/KafkaMetadataKeys$.html).
+
+### Skipping messages
+
+You may only want to apply your logic to a subset of the messages that the topic publishes and skip the others. The `Flow` that is passed to [`Subscriber.atLeastOnce`](api/com/lightbend/lagom/scaladsl/api/broker/Subscriber.html#atLeastOnce\(flow:akka.stream.scaladsl.Flow[Payload,akka.Done,_]\):scala.concurrent.Future[akka.Done]) must emit exactly one `Done` element for each element that it receives. It must also emit them in the same order that the elements were received. This means that you must not use methods such as `filter` or `collect` on the `Flow` which would drop elements.
+
+The easiest way to achieve this is to use a total function which returns `Done` for the elements that should be skipped. For example:
+
+@[subscribe-to-topic-skip-messages](code/docs/scaladsl/mb/AnotherServiceImpl.scala)
 
 ## Polymorphic event streams
 
@@ -87,7 +103,7 @@ While the JSON for the `BlogPostPublished` event will look like this:
 }
 ```
 
-You can do that using [Play JSON transformers](https://www.playframework.com/documentation/2.6.x/ScalaJsonTransformers#Case-5:-Put-a-given-value-in-a-new-branch):
+You can do that using [Play JSON transformers](https://www.playframework.com/documentation/2.7.x/ScalaJsonTransformers#Case-5:-Put-a-given-value-in-a-new-branch):
 
 @[polymorphic-play-json](code/docs/scaladsl/mb/BlogPostService.scala)
 

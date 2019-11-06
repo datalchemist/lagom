@@ -1,17 +1,24 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.testkit.services
 
 import java.util.concurrent.ConcurrentLinkedQueue
 
-import akka.{ Done, NotUsed }
+import akka.Done
+import akka.NotUsed
 import akka.stream.scaladsl.Flow
-import com.lightbend.lagom.scaladsl.api.{ Descriptor, Service, ServiceCall }
+import com.lightbend.lagom.scaladsl.api._
 import com.lightbend.lagom.scaladsl.api.Service._
 import com.lightbend.lagom.scaladsl.api.broker.Topic
-import com.lightbend.lagom.scaladsl.playjson.{ JsonSerializer, JsonSerializerRegistry }
-import com.lightbend.lagom.scaladsl.server.{ LagomApplication, LagomApplicationContext }
+import com.lightbend.lagom.scaladsl.playjson.JsonSerializer
+import com.lightbend.lagom.scaladsl.playjson.JsonSerializerRegistry
+import com.lightbend.lagom.scaladsl.server.LagomApplication
+import com.lightbend.lagom.scaladsl.server.LagomApplicationContext
+import com.lightbend.lagom.scaladsl.persistence.cassandra.CassandraPersistenceComponents
+import com.typesafe.config.ConfigFactory
+import play.api.Configuration
 import play.api.libs.ws.ahc.AhcWSComponents
 
 import scala.collection.immutable.Seq
@@ -22,7 +29,6 @@ object AlphaService {
 }
 
 trait AlphaService extends Service {
-
   import AlphaService.TOPIC_ID
 
   override def descriptor: Descriptor = {
@@ -38,7 +44,6 @@ trait AlphaService extends Service {
 case class AlphaEvent(message: Int)
 
 object AlphaEvent {
-
   import play.api.libs.json._
 
   implicit val format: Format[AlphaEvent] = Json.format[AlphaEvent]
@@ -52,13 +57,28 @@ object FakesSerializerRegistry extends JsonSerializerRegistry {
 // ------------------------------------------------------
 
 abstract class DownstreamApplication(context: LagomApplicationContext)
-  extends LagomApplication(context)
-  with AhcWSComponents {
+    extends LagomApplication(context)
+    with CassandraPersistenceComponents
+    with ProvidesAdditionalConfiguration
+    with AhcWSComponents {
+  // This is a hack so C* persistence in this Applicaiton doesn't complain. C* Persistence is only used
+  // so intances of this Application can mix-in a TopicComponents implementation (Test or Kafka)
+  override def additionalConfiguration: AdditionalConfiguration = {
+    import scala.collection.JavaConverters._
+    super.additionalConfiguration ++ ConfigFactory.parseMap(
+      Map(
+        "cassandra-journal.keyspace"                     -> "asdf",
+        "cassandra-snapshot-store.keyspace"              -> "asdf",
+        "lagom.persistence.read-side.cassandra.keyspace" -> "asdf"
+      ).asJava
+    )
+  }
+
+  override lazy val jsonSerializerRegistry: FakesSerializerRegistry.type = FakesSerializerRegistry
 
   lazy val alphaService = serviceClient.implement[AlphaService]
 
   override lazy val lagomServer = serverFor[CharlieService](new CharlieServiceImpl(alphaService))
-
 }
 
 trait CharlieService extends Service {
@@ -67,15 +87,18 @@ trait CharlieService extends Service {
       .addCalls(
         namedCall("messages", messages)
       )
+      .addTopics(
+        topic("charlie-topic", topicCall)
+      )
   }
 
   def messages: ServiceCall[NotUsed, Seq[ReceivedMessage]]
+  def topicCall: Topic[String]
 }
 
 case class ReceivedMessage(topicId: String, msg: Int)
 
 object ReceivedMessage {
-
   import play.api.libs.json._
 
   implicit val format: Format[ReceivedMessage] = Json.format[ReceivedMessage]
@@ -97,4 +120,6 @@ class CharlieServiceImpl(alpha: AlphaService) extends CharlieService {
       Seq(receivedMessages.asScala.toSeq: _*)
     }
   }
+
+  override def topicCall: Topic[String] = ???
 }

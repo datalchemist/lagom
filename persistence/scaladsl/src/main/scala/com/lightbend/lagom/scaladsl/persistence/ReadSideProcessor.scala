@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.persistence
 
 import akka.Done
@@ -9,7 +10,8 @@ import akka.stream.scaladsl.Flow
 
 import scala.concurrent.Future
 import akka.NotUsed
-import akka.persistence.query.{ NoOffset, Offset }
+import akka.persistence.query.NoOffset
+import akka.persistence.query.Offset
 
 object ReadSideProcessor {
   /**
@@ -18,7 +20,6 @@ object ReadSideProcessor {
    * This is responsible for the actual read side handling, including handling offsets and the events themselves.
    */
   abstract class ReadSideHandler[Event <: AggregateEvent[Event]] {
-
     /**
      * Prepare the database for all processors.
      *
@@ -62,7 +63,6 @@ object ReadSideProcessor {
      */
     def handle(): Flow[EventStreamElement[Event], Done, NotUsed]
   }
-
 }
 
 /**
@@ -83,7 +83,6 @@ object ReadSideProcessor {
  * just focus on handling the events themselves.
  */
 abstract class ReadSideProcessor[Event <: AggregateEvent[Event]] {
-
   /**
    * Return a [[ReadSideProcessor#ReadSideHandler]] for the given offset type.
    *

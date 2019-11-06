@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.javadsl.broker.kafka;
 
 import akka.actor.ActorSystem;
@@ -13,34 +14,65 @@ import com.lightbend.lagom.javadsl.api.Descriptor;
 import com.lightbend.lagom.javadsl.api.ServiceInfo;
 import com.lightbend.lagom.javadsl.api.ServiceLocator;
 import com.lightbend.lagom.javadsl.api.broker.Topic;
+import com.typesafe.config.Config;
 import scala.concurrent.ExecutionContext;
 
 import javax.inject.Inject;
 
-/**
- * Factory for creating topics instances.
- */
+/** Factory for creating topics instances. */
 public class KafkaTopicFactory implements TopicFactory {
-    private final ServiceInfo serviceInfo;
-    private final ActorSystem system;
-    private final Materializer materializer;
-    private final ExecutionContext executionContext;
-    private final KafkaConfig config;
-    private final ServiceLocator serviceLocator;
+  private final ServiceInfo serviceInfo;
+  private final ActorSystem system;
+  private final Materializer materializer;
+  private final ExecutionContext executionContext;
+  private final KafkaConfig kafkaConfig;
+  private final ServiceLocator serviceLocator;
 
-    @Inject
-    public KafkaTopicFactory(ServiceInfo serviceInfo, ActorSystem system, Materializer materializer,
-            ExecutionContext executionContext, ServiceLocator serviceLocator) {
-        this.serviceInfo = serviceInfo;
-        this.system = system;
-        this.materializer = materializer;
-        this.executionContext = executionContext;
-        this.config = KafkaConfig$.MODULE$.apply(system.settings().config());
-        this.serviceLocator = serviceLocator;
-    }
+  /**
+   * @deprecated As of release 1.6.0. Use {@link #KafkaTopicFactory(ServiceInfo, ActorSystem,
+   *     Materializer, ExecutionContext, ServiceLocator, Config)} instead.
+   */
+  @Deprecated
+  public KafkaTopicFactory(
+      ServiceInfo serviceInfo,
+      ActorSystem system,
+      Materializer materializer,
+      ExecutionContext executionContext,
+      ServiceLocator serviceLocator) {
+    this(
+        serviceInfo,
+        system,
+        materializer,
+        executionContext,
+        serviceLocator,
+        system.settings().config());
+  }
 
-    @Override
-    public <Message> Topic<Message> create(Descriptor.TopicCall<Message> topicCall) {
-        return new JavadslKafkaTopic<>(config, topicCall, serviceInfo, system, serviceLocator, materializer, executionContext);
-    }
+  @Inject
+  public KafkaTopicFactory(
+      ServiceInfo serviceInfo,
+      ActorSystem system,
+      Materializer materializer,
+      ExecutionContext executionContext,
+      ServiceLocator serviceLocator,
+      Config config) {
+    this.serviceInfo = serviceInfo;
+    this.system = system;
+    this.materializer = materializer;
+    this.executionContext = executionContext;
+    this.kafkaConfig = KafkaConfig$.MODULE$.apply(config);
+    this.serviceLocator = serviceLocator;
+  }
+
+  @Override
+  public <Message> Topic<Message> create(Descriptor.TopicCall<Message> topicCall) {
+    return new JavadslKafkaTopic<>(
+        kafkaConfig,
+        topicCall,
+        serviceInfo,
+        system,
+        serviceLocator,
+        materializer,
+        executionContext);
+  }
 }

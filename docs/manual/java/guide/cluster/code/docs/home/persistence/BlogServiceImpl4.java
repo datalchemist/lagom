@@ -1,6 +1,10 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.home.persistence;
 
-//#service-impl
+// #service-impl
 import akka.NotUsed;
 import com.lightbend.lagom.javadsl.api.ServiceCall;
 import com.lightbend.lagom.javadsl.pubsub.PubSubRef;
@@ -22,8 +26,7 @@ public class BlogServiceImpl4 implements BlogService4 {
 
   @Override
   public ServiceCall<NotUsed, Source<BlogEvent.PostPublished, ?>> getNewPosts() {
-    return request ->
-      CompletableFuture.completedFuture(publishedTopic.subscriber());
+    return request -> CompletableFuture.completedFuture(publishedTopic.subscriber());
   }
 }
-//#service-impl
+// #service-impl

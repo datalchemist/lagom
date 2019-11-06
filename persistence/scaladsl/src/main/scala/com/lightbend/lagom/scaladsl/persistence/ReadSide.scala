@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.persistence
 
 /**
@@ -9,7 +10,6 @@ package com.lightbend.lagom.scaladsl.persistence
  * Handles the management of read-sides.
  */
 trait ReadSide {
-
   /**
    * Register a read-side processor with Lagom.
    *
@@ -18,5 +18,4 @@ trait ReadSide {
    * not close over shared mutable state that is not thread-safe.
    */
   def register[Event <: AggregateEvent[Event]](processorFactory: => ReadSideProcessor[Event]): Unit
-
 }

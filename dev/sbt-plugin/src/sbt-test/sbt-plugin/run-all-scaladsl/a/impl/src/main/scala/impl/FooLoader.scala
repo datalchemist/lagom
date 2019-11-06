@@ -1,6 +1,11 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package impl
 
-import java.nio.file.{Files, StandardOpenOption}
+import java.nio.file.Files
+import java.nio.file.StandardOpenOption
 import java.util.Date
 
 import com.lightbend.lagom.scaladsl.api.ServiceLocator.NoServiceLocator
@@ -21,12 +26,14 @@ class FooLoader extends LagomApplicationLoader {
     new FooApplication(context) with LagomDevModeComponents
 }
 
-abstract class FooApplication(context: LagomApplicationContext)
-  extends LagomApplication(context)
-    with AhcWSComponents {
+abstract class FooApplication(context: LagomApplicationContext) extends LagomApplication(context) with AhcWSComponents {
 
   override lazy val lagomServer = serverFor[FooService](wire[FooServiceImpl])
 
-  Files.write(environment.getFile("target/reload.log").toPath, s"${new Date()} - reloaded\n".getBytes("utf-8"),
-    StandardOpenOption.CREATE, StandardOpenOption.APPEND)
+  Files.write(
+    environment.getFile("target/reload.log").toPath,
+    s"${new Date()} - reloaded\n".getBytes("utf-8"),
+    StandardOpenOption.CREATE,
+    StandardOpenOption.APPEND
+  )
 }

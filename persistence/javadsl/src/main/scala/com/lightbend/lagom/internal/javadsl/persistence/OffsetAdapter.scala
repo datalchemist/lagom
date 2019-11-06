@@ -1,9 +1,13 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.javadsl.persistence
 
-import akka.persistence.query.{ NoOffset, Offset, Sequence, TimeBasedUUID }
+import akka.persistence.query.NoOffset
+import akka.persistence.query.Offset
+import akka.persistence.query.Sequence
+import akka.persistence.query.TimeBasedUUID
 import com.lightbend.lagom.javadsl.persistence.{ Offset => LagomJavaDslOffset }
 
 /**
@@ -12,7 +16,6 @@ import com.lightbend.lagom.javadsl.persistence.{ Offset => LagomJavaDslOffset }
  * Converts between the Akka Persistence Query Offset type and the internal Lagom Java Offset type
  */
 object OffsetAdapter {
-
   def offsetToDslOffset(offset: Offset): LagomJavaDslOffset = offset match {
     case TimeBasedUUID(uuid) => LagomJavaDslOffset.timeBasedUUID(uuid)
     case Sequence(value)     => LagomJavaDslOffset.sequence(value)
@@ -26,5 +29,4 @@ object OffsetAdapter {
     case LagomJavaDslOffset.NONE                => NoOffset
     case _                                      => throw new IllegalArgumentException("Unsuppoerted offset type " + dslOffset.getClass.getName)
   }
-
 }

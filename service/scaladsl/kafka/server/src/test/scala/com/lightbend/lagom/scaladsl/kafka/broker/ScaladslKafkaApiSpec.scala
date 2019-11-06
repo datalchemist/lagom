@@ -1,57 +1,95 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.kafka.broker
 
+import java.io.Closeable
+import java.io.File
 import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.{ CountDownLatch, TimeUnit }
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 import akka.cluster.Cluster
-import akka.persistence.query.{ NoOffset, Offset, Sequence }
+import akka.persistence.query.NoOffset
+import akka.persistence.query.Offset
+import akka.persistence.query.Sequence
 import akka.stream.OverflowStrategy
-import akka.stream.scaladsl.{ Flow, Sink, Source, SourceQueue }
-import akka.{ Done, NotUsed }
-import com.lightbend.lagom.internal.kafka.KafkaLocalServer
-import com.lightbend.lagom.scaladsl.api.broker.{ Message, MetadataKey, Topic }
-import com.lightbend.lagom.scaladsl.api.broker.kafka.{ KafkaProperties, PartitionKeyStrategy }
-import com.lightbend.lagom.scaladsl.api.{ Descriptor, Service }
+import akka.stream.scaladsl.Flow
+import akka.stream.scaladsl.Sink
+import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.SourceQueue
+import akka.Done
+import akka.NotUsed
+import com.lightbend.lagom.dev.MiniLogger
+import com.lightbend.lagom.dev.Servers.KafkaServer
+import com.lightbend.lagom.scaladsl.api.broker.Message
+import com.lightbend.lagom.scaladsl.api.broker.Topic
+import com.lightbend.lagom.scaladsl.api.broker.kafka.KafkaProperties
+import com.lightbend.lagom.scaladsl.api.broker.kafka.PartitionKeyStrategy
+import com.lightbend.lagom.scaladsl.api.Descriptor
+import com.lightbend.lagom.scaladsl.api.Service
 import com.lightbend.lagom.scaladsl.broker.TopicProducer
-import com.lightbend.lagom.scaladsl.broker.kafka.{ KafkaMetadataKeys, LagomKafkaComponents }
+import com.lightbend.lagom.scaladsl.broker.kafka.KafkaMetadataKeys
+import com.lightbend.lagom.scaladsl.broker.kafka.LagomKafkaComponents
 import com.lightbend.lagom.scaladsl.client.ConfigurationServiceLocatorComponents
 import com.lightbend.lagom.scaladsl.kafka.broker.ScaladslKafkaApiSpec._
 import com.lightbend.lagom.scaladsl.persistence.AggregateEvent
+import com.lightbend.lagom.scaladsl.playjson.EmptyJsonSerializerRegistry
 import com.lightbend.lagom.scaladsl.server._
 import com.lightbend.lagom.spi.persistence.InMemoryOffsetStore
+import com.typesafe.config.ConfigFactory
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest._
-import play.api.Configuration
+import org.slf4j.LoggerFactory
 import play.api.libs.ws.ahc.AhcWSComponents
 
 import scala.collection.mutable
-import scala.concurrent.{ Await, Promise }
+import scala.concurrent.Await
+import scala.concurrent.Promise
 import scala.concurrent.duration._
 
-class ScaladslKafkaApiSpec extends WordSpecLike
-  with Matchers
-  with BeforeAndAfter
-  with BeforeAndAfterAll
-  with ScalaFutures
-  with OptionValues {
+class ScaladslKafkaApiSpec
+    extends WordSpecLike
+    with Matchers
+    with BeforeAndAfter
+    with BeforeAndAfterAll
+    with ScalaFutures
+    with OptionValues {
+  private val log = LoggerFactory.getLogger(getClass)
+  private val miniLogger = new MiniLogger {
+    def debug(message: => String): Unit = log.debug(message)
+    def info(message: => String): Unit  = log.info(message)
+  }
 
-  override implicit val patienceConfig = PatienceConfig(30.seconds, 150.millis)
+  implicit override val patienceConfig = PatienceConfig(30.seconds, 150.millis)
+
+  private final val kafkaPort          = 9092
+  private final val kafkaZooKeeperPort = 2181
 
   private val application = {
-    new LagomApplication(LagomApplicationContext.Test) with AhcWSComponents with LagomKafkaComponents with ConfigurationServiceLocatorComponents {
-      override lazy val offsetStore = new InMemoryOffsetStore
-      override lazy val lagomServer = serverFor[TestService](new TestServiceImpl)
+    new LagomApplication(LagomApplicationContext.Test)
+      with AhcWSComponents
+      with LagomKafkaComponents
+      with ConfigurationServiceLocatorComponents {
+      override lazy val offsetStore            = new InMemoryOffsetStore
+      override lazy val jsonSerializerRegistry = EmptyJsonSerializerRegistry
+      override lazy val lagomServer            = serverFor[TestService](new TestServiceImpl)
 
-      override def additionalConfiguration = super.additionalConfiguration ++ Configuration.from(Map(
-        "akka.remote.netty.tcp.port" -> "0",
-        "akka.remote.netty.tcp.hostname" -> "127.0.0.1",
-        "akka.persistence.journal.plugin" -> "akka.persistence.journal.inmem",
-        "akka.persistence.snapshot-store.plugin" -> "akka.persistence.snapshot-store.local",
-        "lagom.services.kafka_native" -> s"tcp://localhost:${KafkaLocalServer.DefaultPort}"
-      ))
+      override def additionalConfiguration = {
+        import scala.collection.JavaConverters._
+        super.additionalConfiguration ++ ConfigFactory.parseMap(
+          Map(
+            "akka.remote.artery.canonical.port"             -> "0",
+            "akka.remote.artery.canonical.hostname"         -> "127.0.0.1",
+            "akka.persistence.journal.plugin"               -> "akka.persistence.journal.inmem",
+            "akka.persistence.snapshot-store.plugin"        -> "akka.persistence.snapshot-store.local",
+            "lagom.cluster.exit-jvm-when-system-terminated" -> "off",
+            "lagom.cluster.bootstrap.enabled"               -> "off",
+            "lagom.services.kafka_native"                   -> s"tcp://localhost:$kafkaPort"
+          ).asJava
+        )
+      }
 
       lazy val testService = serviceClient.implement[TestService]
     }
@@ -59,12 +97,24 @@ class ScaladslKafkaApiSpec extends WordSpecLike
 
   import application.materializer
 
-  private val kafkaServer = KafkaLocalServer(cleanOnStart = true)
+  private val kafkaServerClasspath: Seq[File] = TestBuildInfo.fullClasspath.toIndexedSeq
+  private var kafkaServer: Option[Closeable]  = None
 
   override def beforeAll(): Unit = {
     super.beforeAll()
 
-    kafkaServer.start()
+    kafkaServer = Some(
+      KafkaServer.start(
+        log = miniLogger,
+        cp = kafkaServerClasspath,
+        kafkaPort = kafkaPort,
+        zooKeeperPort = kafkaZooKeeperPort,
+        kafkaPropertiesFile = None,
+        jvmOptions = Nil,
+        targetDir = TestBuildInfo.target,
+        cleanOnStart = true,
+      )
+    )
 
     Cluster(application.actorSystem).join(Cluster(application.actorSystem).selfAddress)
   }
@@ -76,20 +126,20 @@ class ScaladslKafkaApiSpec extends WordSpecLike
 
   override def afterAll(): Unit = {
     application.application.stop().futureValue
-    kafkaServer.stop()
+
+    kafkaServer.foreach(_.close())
+    kafkaServer = None
 
     super.afterAll()
   }
 
   "The Kafka message broker api" should {
-
     import scala.language.reflectiveCalls
     val testService = application.testService
 
     "eagerly publish event stream registered in the service topic implementation" in {
       val messageReceived = Promise[String]()
-      testService.test1Topic
-        .subscribe
+      testService.test1Topic.subscribe
         .withGroupId("testservice1")
         .atLeastOnce {
           Flow[String].map { message =>
@@ -106,10 +156,9 @@ class ScaladslKafkaApiSpec extends WordSpecLike
 
     "self-heal if failure occurs while running the publishing stream" in {
       // Create a subscriber that tracks the first two messages it receives
-      val firstTimeReceived = Promise[String]()
+      val firstTimeReceived  = Promise[String]()
       val secondTimeReceived = Promise[String]()
-      testService.test2Topic
-        .subscribe
+      testService.test2Topic.subscribe
         .withGroupId("testservice2")
         .atLeastOnce {
           Flow[String].map { message =>
@@ -175,12 +224,9 @@ class ScaladslKafkaApiSpec extends WordSpecLike
         application.offsetStore.prepare("topicProducer-" + testService.test3Topic.topicId.name, "singleton").futureValue
 
       // No message was consumed from this topic, hence we expect the last stored offset to be NoOffset
-      val offsetDao = reloadOffset()
+      val offsetDao     = reloadOffset()
       val initialOffset = offsetDao.loadedOffset
       initialOffset shouldBe NoOffset
-
-      // Fake setting an offset to simulate a topic that has been restarted
-      offsetDao.saveOffset(Sequence(1))
 
       // Put some messages in the stream
       test3EventJournal.append("firstMessage")
@@ -189,8 +235,7 @@ class ScaladslKafkaApiSpec extends WordSpecLike
 
       // Wait for a subscriber to consume them all (which ensures they've all been published)
       val allMessagesReceived = new CountDownLatch(3)
-      testService.test3Topic
-        .subscribe
+      testService.test3Topic.subscribe
         .withGroupId("testservice3")
         .atLeastOnce {
           Flow[String].map { _ =>
@@ -210,19 +255,20 @@ class ScaladslKafkaApiSpec extends WordSpecLike
       val materialized = new CountDownLatch(2)
 
       @volatile var failOnMessageReceived = true
-      testService.test4Topic
-        .subscribe
+      testService.test4Topic.subscribe
         .withGroupId("testservice4")
         .atLeastOnce {
-          Flow[String].map { _ =>
-            if (failOnMessageReceived) {
-              failOnMessageReceived = false
-              println("Expect to see an error below: Simulate consumer failure")
-              throw new IllegalStateException("Simulate consumer failure")
-            } else Done
-          }.mapMaterializedValue { _ =>
-            materialized.countDown()
-          }
+          Flow[String]
+            .map { _ =>
+              if (failOnMessageReceived) {
+                failOnMessageReceived = false
+                println("Expect to see an error below: Simulate consumer failure")
+                throw new IllegalStateException("Simulate consumer failure")
+              } else Done
+            }
+            .mapMaterializedValue { _ =>
+              materialized.countDown()
+            }
         }
 
       test4EventJournal.append("message")
@@ -240,8 +286,7 @@ class ScaladslKafkaApiSpec extends WordSpecLike
       // Now we register a consumer that will fail while processing a message. Because we are using at-most-once
       // delivery, the message that caused the failure won't be re-processed.
       @volatile var countProcessedMessages = 0
-      val expectFailure = testService.test5Topic
-        .subscribe
+      val expectFailure = testService.test5Topic.subscribe
         .withGroupId("testservice5")
         .atMostOnceSource
         .via {
@@ -258,9 +303,9 @@ class ScaladslKafkaApiSpec extends WordSpecLike
 
     "allow the consumer to batch" in {
       val batchSize = 4
-      val latch = new CountDownLatch(batchSize)
-      testService.test6Topic
-        .subscribe
+      val latch     = new CountDownLatch(batchSize)
+      testService.test6Topic.subscribe
+        .withGroupId("testservice6")
         .atLeastOnce {
           Flow[String].grouped(batchSize).mapConcat { messages =>
             messages.map { _ =>
@@ -288,6 +333,8 @@ class ScaladslKafkaApiSpec extends WordSpecLike
         msg.messageKeyAsString shouldBe "A"
         msg.get(KafkaMetadataKeys.Topic).value shouldBe "test7"
         msg.get(KafkaMetadataKeys.Headers) should not be None
+        msg.get(KafkaMetadataKeys.Timestamp) should not be None
+        msg.get(KafkaMetadataKeys.TimestampType) should not be None
         msg.get(KafkaMetadataKeys.Partition).value shouldBe messages.head.get(KafkaMetadataKeys.Partition).value
       }
       messages.foreach(runAssertions)
@@ -298,13 +345,10 @@ class ScaladslKafkaApiSpec extends WordSpecLike
       messages(2).payload shouldBe "A3"
       messages(2).get(KafkaMetadataKeys.Offset).value shouldBe (offset + 2)
     }
-
   }
-
 }
 
 object ScaladslKafkaApiSpec {
-
   private val test1EventJournal = new EventJournal[String]
   private val test2EventJournal = new EventJournal[String]
   private val test3EventJournal = new EventJournal[String]
@@ -367,9 +411,9 @@ object ScaladslKafkaApiSpec {
 
   class EventJournal[Event] {
     private type Element = (Event, Sequence)
-    private val offset = new AtomicLong()
-    private val storedEvents = mutable.MutableList.empty[Element]
-    private val subscribers = mutable.MutableList.empty[SourceQueue[Element]]
+    private val offset       = new AtomicLong()
+    private val storedEvents = mutable.ListBuffer.empty[Element]
+    private val subscribers  = mutable.ListBuffer.empty[SourceQueue[Element]]
 
     def eventStream(fromOffset: Offset): Source[(Event, Offset), _] = {
       val minOffset: Long = fromOffset match {
@@ -378,7 +422,8 @@ object ScaladslKafkaApiSpec {
         case _               => throw new IllegalArgumentException(s"Sequence offset required, but got $fromOffset")
       }
 
-      Source.queue[Element](8, OverflowStrategy.fail)
+      Source
+        .queue[Element](8, OverflowStrategy.fail)
         .mapMaterializedValue { queue =>
           synchronized {
             storedEvents.foreach(queue.offer)
@@ -398,5 +443,4 @@ object ScaladslKafkaApiSpec {
       }
     }
   }
-
 }

@@ -1,8 +1,10 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.maven
 
+import com.lightbend.lagom.dev.Reloader.DevServerBinding
 import org.apache.maven.project.MavenProject
 
 /**
@@ -27,8 +29,8 @@ object LagomKeys {
   /** Whether this project is a Play service */
   val PlayService = new LagomKey[Boolean]("playService")
 
-  /** The URL of the service */
-  val LagomServiceUrl = new LagomKey[String]("lagomServiceUrl")
+  /** List of bindings this service is exposing */
+  val LagomServiceBindings = new LagomKey[Seq[DevServerBinding]]("lagomServiceBindings")
 }
 
 final class LagomKey[A](name: String) {

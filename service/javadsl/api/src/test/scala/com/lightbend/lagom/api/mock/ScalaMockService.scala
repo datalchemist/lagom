@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.api.mock
 
 import java.util.UUID
@@ -12,7 +13,6 @@ import com.lightbend.lagom.javadsl.api.ServiceCall
 import com.lightbend.lagom.javadsl.api.transport.Method
 
 trait ScalaMockService extends Service {
-
   def hello(): ServiceCall[UUID, String]
 
   override def descriptor(): Descriptor =

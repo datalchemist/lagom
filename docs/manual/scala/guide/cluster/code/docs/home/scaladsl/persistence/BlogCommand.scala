@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.home.scaladsl.persistence
 
 //#full-example
@@ -18,7 +22,8 @@ object BlogCommand {
     JsonSerializer(Json.format[AddPostDone]),
     JsonSerializer(emptySingletonFormat(GetPost)),
     JsonSerializer(Json.format[ChangeBody]),
-    JsonSerializer(emptySingletonFormat(Publish)))
+    JsonSerializer(emptySingletonFormat(Publish))
+  )
 }
 
 //#AddPost

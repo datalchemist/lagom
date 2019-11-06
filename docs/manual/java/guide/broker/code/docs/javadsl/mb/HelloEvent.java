@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.javadsl.mb;
 
 import com.lightbend.lagom.serialization.Jsonable;
@@ -7,7 +11,7 @@ import com.lightbend.lagom.javadsl.persistence.AggregateEventTag;
 public interface HelloEvent extends Jsonable, AggregateEvent<HelloEvent> {
 
   @Override
-  default public AggregateEventTag<HelloEvent> aggregateTag() {
+  public default AggregateEventTag<HelloEvent> aggregateTag() {
     return HelloEventTag.INSTANCE;
   }
 

@@ -1,6 +1,6 @@
 # Configuring Logging
 
-Lagom uses SLF4J for logging, backed by [Logback](https://logback.qos.ch/) as its default logging engine.  See the [Logback documentation](https://logback.qos.ch/manual/configuration.html) for details on configuration.
+Lagom uses SLF4J for logging, backed by [Logback](http://logback.qos.ch/) as its default logging engine.  See the [Logback documentation](http://logback.qos.ch/manual/configuration.html) for details on configuration.
 
 ## Default configuration
 
@@ -16,7 +16,7 @@ A few things to note:
 
 * The logger logs full exception stack traces and full-qualified logger names.
 * Lagom uses ANSI color codes by default in level messages.
-* In production, Lagom puts the logger behind the logback [AsyncAppender](https://logback.qos.ch/manual/appenders.html#AsyncAppender).  For details on the performance implications on this, see this [blog post](http://blog.takipi.com/how-to-instantly-improve-your-java-logging-with-7-logback-tweaks/).
+* In production, Lagom puts the logger behind the logback [AsyncAppender](http://logback.qos.ch/manual/appenders.html#AsyncAppender).  For details on the performance implications on this, see this [blog post](https://blog.overops.com/how-to-instantly-improve-your-java-logging-with-7-logback-tweaks/).
 
 ## Custom configuration
 
@@ -43,7 +43,7 @@ To specify a configuration file to be loaded from the file system use the system
 
 ## Play Lagom applications
 
-When integrating a Play application in Lagom via the `LagomPlay` sbt plugin, the default Play logging module is used. The main difference, with respect to the Lagom logging module, is that the Play logging module provides different default logback configurations. Read the Play framework [Configuring Logging](https://www.playframework.com/documentation/2.6.x/SettingsLogger) documentation for details.
+When integrating a Play application in Lagom via the `LagomPlay` sbt plugin, the default Play logging module is used. The main difference, with respect to the Lagom logging module, is that the Play logging module provides different default logback configurations. Read the Play framework [Configuring Logging](https://www.playframework.com/documentation/2.7.x/SettingsLogger) documentation for details.
 
 ## Internal framework logging
 
@@ -75,7 +75,7 @@ And, you will also need to add the following in your project's `application.conf
 akka.loglevel=DEBUG
 ```
 
-Furthermore, you may also wish to configure an appender for the Akka loggers that includes useful properties such as thread and actor address.  For more information about configuring Akka's logging, including details on Logback and Slf4j integration, see the [Akka documentation](https://doc.akka.io/docs/akka/2.5/logging.html).
+Furthermore, you may also wish to configure an appender for the Akka loggers that includes useful properties such as thread and actor address.  For more information about configuring Akka's logging, including details on Logback and Slf4j integration, see the [Akka documentation](https://doc.akka.io/docs/akka/2.6/logging.html).
 
 ### Play logging configuration
 

@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.home.scaladsl.persistence
 
 //#imports
@@ -16,12 +20,10 @@ import scala.concurrent.Promise
 //#imports
 
 trait CassandraBlogEventProcessor {
-
   trait Initial {
     //#initial
     class BlogEventProcessor(session: CassandraSession, readSide: CassandraReadSide)(implicit ec: ExecutionContext)
-      extends ReadSideProcessor[BlogEvent] {
-
+        extends ReadSideProcessor[BlogEvent] {
       override def buildHandler(): ReadSideProcessor.ReadSideHandler[BlogEvent] = {
         // TODO build read side handler
         ???
@@ -36,8 +38,7 @@ trait CassandraBlogEventProcessor {
   }
 
   class BlogEventProcessor(session: CassandraSession, readSide: CassandraReadSide)(implicit ec: ExecutionContext)
-    extends ReadSideProcessor[BlogEvent] {
-
+      extends ReadSideProcessor[BlogEvent] {
     //#tag
     override def aggregateTags: Set[AggregateEventTag[BlogEvent]] =
       BlogEvent.Tag.allTags
@@ -45,12 +46,14 @@ trait CassandraBlogEventProcessor {
 
     //#create-table
     private def createTable(): Future[Done] =
-      session.executeCreateTable("CREATE TABLE IF NOT EXISTS blogsummary ( " +
-        "id TEXT, title TEXT, PRIMARY KEY (id))")
+      session.executeCreateTable(
+        "CREATE TABLE IF NOT EXISTS blogsummary ( " +
+          "id TEXT, title TEXT, PRIMARY KEY (id))"
+      )
     //#create-table
 
     //#prepare-statements
-    private val writeTitlePromise = Promise[PreparedStatement] // initialized in prepare
+    private val writeTitlePromise                     = Promise[PreparedStatement] // initialized in prepare
     private def writeTitle: Future[PreparedStatement] = writeTitlePromise.future
 
     private def prepareWriteTitle(): Future[Done] = {
@@ -77,7 +80,7 @@ trait CassandraBlogEventProcessor {
       //#create-builder
 
       //#register-global-prepare
-      builder.setGlobalPrepare(createTable)
+      builder.setGlobalPrepare(() => createTable())
       //#register-global-prepare
 
       //#register-prepare
@@ -93,5 +96,4 @@ trait CassandraBlogEventProcessor {
       //#build
     }
   }
-
 }

@@ -1,9 +1,11 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.api
 
-import com.typesafe.config.{ Config, ConfigFactory }
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
 import play.api.Configuration
 
 /**
@@ -29,22 +31,12 @@ trait ProvidesAdditionalConfiguration {
  * Additional configuration that will be added to the main system configuration.
  */
 final class AdditionalConfiguration private (private[lagom] val configuration: Config) {
-
-  @deprecated(message = "prefer constructor using typesafe Config instead", since = "1.4.0")
-  def this(configuration: Configuration) = this(configuration.underlying)
-
   /**
    * Add configuration to the additional configuration.
    */
   def ++(configurationToAdd: Config): AdditionalConfiguration = {
     new AdditionalConfiguration(configuration.withFallback(configurationToAdd))
   }
-
-  @deprecated(message = "prefer method using typesafe Config instead", since = "1.4.0")
-  def ++(configurationToAdd: Configuration): AdditionalConfiguration = {
-    this.++(configurationToAdd.underlying)
-  }
-
 }
 
 object AdditionalConfiguration {

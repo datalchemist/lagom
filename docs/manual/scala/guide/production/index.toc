@@ -1,4 +1,4 @@
 ProductionOverview:Production Overview
-ConductR:Lightbend ConductR
-ReactivePlatform:Reactive Platform
+AkkaDiscoveryIntegration:Akka Discovery Integration
+LightbendPlatform:Lightbend Platform
 

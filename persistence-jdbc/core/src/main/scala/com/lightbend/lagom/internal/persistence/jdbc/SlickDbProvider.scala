@@ -1,15 +1,18 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.persistence.jdbc
 
 import javax.naming.InitialContext
 import javax.sql.DataSource
 
 import com.typesafe.config.Config
-import play.api.db.{ DBApi, Database }
+import play.api.db.DBApi
+import play.api.db.Database
 import play.api.inject.ApplicationLifecycle
-import slick.jdbc.JdbcBackend.{ DatabaseDef, Database => SlickDatabase }
+import slick.jdbc.JdbcBackend.DatabaseDef
+import slick.jdbc.JdbcBackend.{ Database => SlickDatabase }
 import slick.util.AsyncExecutor
 
 import scala.util.Try
@@ -22,7 +25,7 @@ private[lagom] object SlickDbProvider {
       // each configured DB having an async-executor section
       // has a Slick DB configured and bound to a JNDI name
       for {
-        dbConfig <- Try(config.getConfig(s"db.$dbName"))
+        dbConfig        <- Try(config.getConfig(s"db.$dbName"))
         asyncExecConfig <- Try(AsyncExecutorConfig(dbConfig.getConfig("async-executor")))
       } yield {
         // a DB config with an async-executor is expected to have an associated jndiDbName
@@ -35,10 +38,10 @@ private[lagom] object SlickDbProvider {
   }
 
   def buildAndBindSlickDatabase(
-    playDb:          Database,
-    asyncExecConfig: AsyncExecutorConfig,
-    jndiDbName:      String,
-    lifecycle:       ApplicationLifecycle
+      playDb: Database,
+      asyncExecConfig: AsyncExecutorConfig,
+      jndiDbName: String,
+      lifecycle: ApplicationLifecycle
   ): Unit = {
     val slickDb =
       buildSlickDatabase(
@@ -59,7 +62,8 @@ private[lagom] object SlickDbProvider {
         minThreads = asyncExecConfig.minConnections,
         maxThreads = asyncExecConfig.numThreads,
         queueSize = asyncExecConfig.queueSize,
-        maxConnections = asyncExecConfig.maxConnections
+        maxConnections = asyncExecConfig.maxConnections,
+        registerMbeans = asyncExecConfig.registerMbeans
       )
     )
   }
@@ -83,19 +87,20 @@ private[lagom] trait AsyncExecutorConfig {
   def minConnections: Int
   def maxConnections: Int
   def queueSize: Int
+  def registerMbeans: Boolean
 }
 
 private[lagom] object AsyncExecutorConfig {
-
   def apply(config: Config): AsyncExecutorConfig = new AsyncExecutorConfigImpl(config)
 
   private final class AsyncExecutorConfigImpl(config: Config) extends AsyncExecutorConfig {
+    val numThreads: Int         = config.getInt("numThreads")
+    val minConnections: Int     = config.getInt("minConnections")
+    val maxConnections: Int     = config.getInt("maxConnections")
+    val queueSize: Int          = config.getInt("queueSize")
+    val registerMbeans: Boolean = config.getBoolean("registerMbeans")
 
-    val numThreads: Int = config.getInt("numThreads")
-    val minConnections: Int = config.getInt("minConnections")
-    val maxConnections: Int = config.getInt("maxConnections")
-    val queueSize: Int = config.getInt("queueSize")
-
-    override def toString: String = s"AsyncExecutorConfig($numThreads, $minConnections, $maxConnections, $queueSize)"
+    override def toString: String =
+      s"AsyncExecutorConfig($numThreads, $minConnections, $maxConnections, $queueSize, $registerMbeans)"
   }
 }

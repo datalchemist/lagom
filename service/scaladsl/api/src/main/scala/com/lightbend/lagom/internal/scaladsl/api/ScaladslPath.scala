@@ -1,16 +1,20 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.scaladsl.api
 
-import com.lightbend.lagom.internal.api.{ Path, StaticPathPart }
-import com.lightbend.lagom.scaladsl.api.Descriptor.{ CallId, NamedCallId, PathCallId, RestCallId }
+import com.lightbend.lagom.internal.api.Path
+import com.lightbend.lagom.internal.api.StaticPathPart
+import com.lightbend.lagom.scaladsl.api.Descriptor.CallId
+import com.lightbend.lagom.scaladsl.api.Descriptor.NamedCallId
+import com.lightbend.lagom.scaladsl.api.Descriptor.PathCallId
+import com.lightbend.lagom.scaladsl.api.Descriptor.RestCallId
 
 /**
  * Path methods specific to the scaladsl
  */
 object ScaladslPath {
-
   def fromCallId(callId: CallId): Path = {
     callId match {
       case rest: RestCallId =>
@@ -23,5 +27,4 @@ object ScaladslPath {
         Path(path, Seq(StaticPathPart(path)), Nil)
     }
   }
-
 }

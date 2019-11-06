@@ -1,19 +1,18 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.javadsl.api.deser;
 
 import akka.stream.javadsl.Source;
 import akka.util.ByteString;
 
-/**
- * A streamed message serializer, for streams of messages.
- */
-public interface StreamedMessageSerializer<MessageEntity> extends MessageSerializer<Source<MessageEntity, ?>,
-        Source<ByteString, ?>> {
+/** A streamed message serializer, for streams of messages. */
+public interface StreamedMessageSerializer<MessageEntity>
+    extends MessageSerializer<Source<MessageEntity, ?>, Source<ByteString, ?>> {
 
-    @Override
-    default boolean isStreamed() {
-        return true;
-    }
+  @Override
+  default boolean isStreamed() {
+    return true;
+  }
 }

@@ -1,13 +1,16 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.persistence.cassandra
 
 import java.net.InetSocketAddress
 import java.net.URI
 
 import scala.collection.immutable
-import scala.concurrent.{ ExecutionContext, Future, Promise }
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
+import scala.concurrent.Promise
 import scala.concurrent.duration._
 import scala.util.control.NoStackTrace
 
@@ -20,14 +23,13 @@ import play.api.Logger
  * Internal API
  */
 private[lagom] final class ServiceLocatorSessionProvider(system: ActorSystem, config: Config)
-  extends ConfigSessionProvider(system, config) {
-
+    extends ConfigSessionProvider(system, config) {
   private val log = Logger(getClass)
 
-  override def lookupContactPoints(clusterId: String)(implicit ec: ExecutionContext): Future[immutable.Seq[InetSocketAddress]] = {
-
-    ServiceLocatorHolder(system).serviceLocatorEventually flatMap { serviceLocatorAdapter =>
-
+  override def lookupContactPoints(
+      clusterId: String
+  )(implicit ec: ExecutionContext): Future[immutable.Seq[InetSocketAddress]] = {
+    ServiceLocatorHolder(system).serviceLocatorEventually.flatMap { serviceLocatorAdapter =>
       serviceLocatorAdapter.locateAll(clusterId).map {
         case Nil => throw new NoContactPointsException(s"No contact points for [$clusterId]")
         case uris =>

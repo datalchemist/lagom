@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package com.example
 
 import akka.NotUsed
@@ -13,9 +17,11 @@ trait A extends Service {
 
   override def descriptor = {
     import Service._
-    named("a").withCalls(
-      pathCall("/hello/:name", hello _)
-    ).withAutoAcl(true)
+    named("a")
+      .withCalls(
+        pathCall("/hello/:name", hello _)
+      )
+      .withAutoAcl(true)
   }
 }
 
@@ -25,8 +31,7 @@ class AImpl extends A {
   }
 }
 
-abstract class AApplication(context: LagomApplicationContext)
-  extends LagomApplication(context) with AhcWSComponents {
+abstract class AApplication(context: LagomApplicationContext) extends LagomApplication(context) with AhcWSComponents {
 
   override def lagomServer = serverFor[A](new AImpl)
 }

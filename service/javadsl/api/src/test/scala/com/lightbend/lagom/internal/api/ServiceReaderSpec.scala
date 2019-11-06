@@ -1,28 +1,35 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.api
 
-import java.lang.reflect.{ InvocationHandler, Type }
+import java.lang.reflect.InvocationHandler
+import java.lang.reflect.Type
 import java.util
-import java.util.{ Optional, UUID }
+import java.util.Optional
+import java.util.UUID
 import java.util.concurrent.CompletionStage
 
 import akka.util.ByteString
 import com.lightbend.lagom.javadsl.api.Descriptor.RestCallId
-import com.lightbend.lagom.javadsl.api.deser.MessageSerializer.{ NegotiatedDeserializer, NegotiatedSerializer }
+import com.lightbend.lagom.javadsl.api.deser.MessageSerializer.NegotiatedDeserializer
+import com.lightbend.lagom.javadsl.api.deser.MessageSerializer.NegotiatedSerializer
 import com.lightbend.lagom.javadsl.api.deser._
-import com.lightbend.lagom.javadsl.api.transport.{ MessageProtocol, Method }
+import com.lightbend.lagom.javadsl.api.transport.MessageProtocol
+import com.lightbend.lagom.javadsl.api.transport.Method
 import com.lightbend.lagom.api.mock._
 import org.scalatest._
-import com.lightbend.lagom.internal.javadsl.api.{ JacksonPlaceholderExceptionSerializer, JacksonPlaceholderSerializerFactory, MethodServiceCallHolder, ServiceReader }
-import com.lightbend.lagom.javadsl.api.{ Descriptor, IllegalPathParameterException, Service, ServiceCall }
+import com.lightbend.lagom.internal.javadsl.api.JacksonPlaceholderExceptionSerializer
+import com.lightbend.lagom.internal.javadsl.api.JacksonPlaceholderSerializerFactory
+import com.lightbend.lagom.internal.javadsl.api.MethodServiceCallHolder
+import com.lightbend.lagom.internal.javadsl.api.ServiceReader
+import com.lightbend.lagom.javadsl.api._
 
 import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
 
 class ServiceReaderSpec extends WordSpec with Matchers with Inside {
-
   "The service reader" should {
     "read a simple Java service descriptor" in {
       val descriptor = serviceDescriptor[MockService]
@@ -85,15 +92,18 @@ class ServiceReaderSpec extends WordSpec with Matchers with Inside {
               override def invoke(request: Any): CompletionStage[Any] = ???
             }
 
-            val blogService = java.lang.reflect.Proxy.newProxyInstance(classOf[BlogService].getClassLoader, Array(classOf[BlogService]), new InvocationHandler {
-              override def invoke(proxy: scala.Any, method: java.lang.reflect.Method, args: Array[AnyRef]): AnyRef = {
-                new ArgsCapturingServiceCall(args)
+            val blogService = java.lang.reflect.Proxy.newProxyInstance(
+              classOf[BlogService].getClassLoader,
+              Array(classOf[BlogService]),
+              new InvocationHandler {
+                override def invoke(proxy: scala.Any, method: java.lang.reflect.Method, args: Array[AnyRef]): AnyRef = {
+                  new ArgsCapturingServiceCall(args)
+                }
               }
-            })
+            )
 
             method.create(blogService, params).asInstanceOf[ArgsCapturingServiceCall].args
         }
-
       }
 
       val blogCall = descriptor.calls().get(0)
@@ -101,10 +111,18 @@ class ServiceReaderSpec extends WordSpec with Matchers with Inside {
       serializeArgs(blogCall, Seq("some name")) should ===(Seq(Seq("some name")))
 
       val postsCall = descriptor.calls().get(1)
-      deserializeParams(postsCall, Seq(Seq("some name"), Seq("3"), Seq("10"))) should ===(Seq("some name", Optional.of(3), Optional.of(10)))
-      serializeArgs(postsCall, Seq("some name", Optional.of(3), Optional.of(10))) should ===(Seq(Seq("some name"), Seq("3"), Seq("10")))
-      deserializeParams(postsCall, Seq(Seq("some name"), Seq(), Seq())) should ===(Seq("some name", Optional.empty, Optional.empty))
-      serializeArgs(postsCall, Seq("some name", Optional.empty, Optional.empty)) should ===(Seq(Seq("some name"), Seq(), Seq()))
+      deserializeParams(postsCall, Seq(Seq("some name"), Seq("3"), Seq("10"))) should ===(
+        Seq("some name", Optional.of(3), Optional.of(10))
+      )
+      serializeArgs(postsCall, Seq("some name", Optional.of(3), Optional.of(10))) should ===(
+        Seq(Seq("some name"), Seq("3"), Seq("10"))
+      )
+      deserializeParams(postsCall, Seq(Seq("some name"), Seq(), Seq())) should ===(
+        Seq("some name", Optional.empty, Optional.empty)
+      )
+      serializeArgs(postsCall, Seq("some name", Optional.empty, Optional.empty)) should ===(
+        Seq(Seq("some name"), Seq(), Seq())
+      )
 
       val postCall = descriptor.calls().get(2)
       deserializeParams(postCall, Seq(Seq("some name"), Seq("10"))) should ===(Seq("some name", 10L))
@@ -115,12 +133,20 @@ class ServiceReaderSpec extends WordSpec with Matchers with Inside {
       serializeArgs(commentCall, Seq("some name", 10L, 20L)) should ===(Seq(Seq("some name"), Seq("10"), Seq("20")))
 
       val commentRepeatColCall = descriptor.calls().get(4)
-      deserializeParams(commentRepeatColCall, Seq(Seq("some name"), Seq("10", "20", "30"))) should ===(Seq("some name", util.Arrays.asList("10", "20", "30")))
-      serializeArgs(commentRepeatColCall, Seq("some name", util.Arrays.asList("10", "20", "30"))) should ===(Seq(Seq("some name"), Seq("10", "20", "30")))
+      deserializeParams(commentRepeatColCall, Seq(Seq("some name"), Seq("10", "20", "30"))) should ===(
+        Seq("some name", util.Arrays.asList("10", "20", "30"))
+      )
+      serializeArgs(commentRepeatColCall, Seq("some name", util.Arrays.asList("10", "20", "30"))) should ===(
+        Seq(Seq("some name"), Seq("10", "20", "30"))
+      )
 
       val commentRepeatListCall = descriptor.calls().get(5)
-      deserializeParams(commentRepeatListCall, Seq(Seq("some name"), Seq("10", "20", "30"))) should ===(Seq("some name", util.Arrays.asList("10", "20", "30")))
-      serializeArgs(commentRepeatListCall, Seq("some name", util.Arrays.asList("10", "20", "30"))) should ===(Seq(Seq("some name"), Seq("10", "20", "30")))
+      deserializeParams(commentRepeatListCall, Seq(Seq("some name"), Seq("10", "20", "30"))) should ===(
+        Seq("some name", util.Arrays.asList("10", "20", "30"))
+      )
+      serializeArgs(commentRepeatListCall, Seq("some name", util.Arrays.asList("10", "20", "30"))) should ===(
+        Seq(Seq("some name"), Seq("10", "20", "30"))
+      )
 
       val commentRepeatSetCall = descriptor.calls().get(6)
       // test for Set is trickier must first sort elements
@@ -132,22 +158,48 @@ class ServiceReaderSpec extends WordSpec with Matchers with Inside {
           set.asInstanceOf[util.HashSet[String]].asScala.toSeq.sorted === Seq("10", "20", "30")
       }
 
-      val ser = serializeArgs(commentRepeatSetCall, Seq("some name", new util.HashSet(util.Arrays.asList("10", "20", "30"))))
+      val ser =
+        serializeArgs(commentRepeatSetCall, Seq("some name", new util.HashSet(util.Arrays.asList("10", "20", "30"))))
       ser.head === Seq("some name")
       ser(1) match {
         case seq => seq.sorted === Seq("10", "20", "30")
       }
 
+      val uuidCall = descriptor.calls().get(7)
+      val uuid     = UUID.randomUUID()
+      deserializeParams(uuidCall, Seq(Seq(uuid.toString))) should ===(Seq(uuid))
+      serializeArgs(uuidCall, Seq(uuid)) should ===(Seq(Seq(uuid.toString)))
     }
 
+    "fail to read a Java service descriptor from a public interface because a message type uses type variables" in {
+      val exception = intercept[IllegalMessageTypeException] {
+        serviceDescriptor[InvalidMessageTypeService]
+      }
+      exception.getMessage should include("<Foo>")
+    }
+
+    "fail to read a Java service descriptor from a public interface because a the topic type is missing" in {
+      val exception = intercept[IllegalMessageTypeException] {
+        serviceDescriptor[MissingTopicTypeService]
+      }
+
+      // When users don't set a Topic type, <Message> is the type of the topic:
+      //     Topic  myMethod();
+      // because <Message> is the unbound type used in Service#topic(). See com.lightbend.lagom.javadsl.api.Service
+      exception.getMessage should include("<TopicMessageType>")
+    }
   }
 
   def serviceDescriptor[S <: Service](implicit ct: ClassTag[S]) = {
-    ServiceReader.resolveServiceDescriptor(ServiceReader.readServiceDescriptor(
+    ServiceReader.resolveServiceDescriptor(
+      ServiceReader.readServiceDescriptor(
+        getClass.getClassLoader,
+        ct.runtimeClass.asInstanceOf[Class[Service]]
+      ),
       getClass.getClassLoader,
-      ct.runtimeClass.asInstanceOf[Class[Service]]
-    ), getClass.getClassLoader, Map(JacksonPlaceholderSerializerFactory -> new SimpleSerializerFactory),
-      Map(JacksonPlaceholderExceptionSerializer -> new SimpleExceptionSerializer))
+      Map(JacksonPlaceholderSerializerFactory   -> new SimpleSerializerFactory),
+      Map(JacksonPlaceholderExceptionSerializer -> new SimpleExceptionSerializer)
+    )
   }
 
   private class SimpleSerializerFactory extends SerializerFactory {
@@ -181,5 +233,4 @@ class ServiceReaderSpec extends WordSpec with Matchers with Inside {
 
     override def deserialize(message: RawExceptionMessage): Throwable = ???
   }
-
 }

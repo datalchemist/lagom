@@ -1,18 +1,25 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.testkit
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.function.{ Function => JFunction }
 
 import akka.Done
-import akka.actor.{ ActorRef, ActorSystem, Props }
+import akka.actor.ActorRef
+import akka.actor.ActorSystem
+import akka.actor.Props
 import akka.stream.Materializer
-import akka.stream.scaladsl.{ Flow, Source }
-import com.lightbend.lagom.internal.testkit.{ InternalSubscriberStub, TopicBufferActor }
+import akka.stream.scaladsl.Flow
+import akka.stream.scaladsl.Source
+import com.lightbend.lagom.internal.testkit.InternalSubscriberStub
+import com.lightbend.lagom.internal.testkit.TopicBufferActor
 import com.lightbend.lagom.scaladsl.api.broker.Topic.TopicId
-import com.lightbend.lagom.scaladsl.api.broker.{ Message, Subscriber, Topic }
+import com.lightbend.lagom.scaladsl.api.broker.Message
+import com.lightbend.lagom.scaladsl.api.broker.Subscriber
+import com.lightbend.lagom.scaladsl.api.broker.Topic
 
 import scala.concurrent.Future
 
@@ -20,7 +27,6 @@ import scala.concurrent.Future
  * Factors [[com.lightbend.lagom.scaladsl.testkit.ProducerStub]]'s.
  */
 final class ProducerStubFactory(actorSystem: ActorSystem, materializer: Materializer) {
-
   private val topics = new ConcurrentHashMap[String, ProducerStub[_]]
 
   def producer[T](topicId: String): ProducerStub[T] = {
@@ -29,7 +35,6 @@ final class ProducerStubFactory(actorSystem: ActorSystem, materializer: Material
     }
     topics.computeIfAbsent(topicId, builder).asInstanceOf[ProducerStub[T]]
   }
-
 }
 
 /**
@@ -59,15 +64,24 @@ final class ProducerStub[T] private[lagom] (topicName: String, actorSystem: Acto
   def send(message: Message[T]): Unit = bufferActor.tell(message, ActorRef.noSender)
 }
 
-private[lagom] class TopicStub[T](val topicId: Topic.TopicId, topicBuffer: ActorRef)(implicit materializer: Materializer) extends Topic[T] {
+private[lagom] class TopicStub[T](val topicId: Topic.TopicId, topicBuffer: ActorRef)(
+    implicit materializer: Materializer
+) extends Topic[T] {
   def subscribe = new SubscriberStub[T, T]("default", topicBuffer, _.payload)
 
-  class SubscriberStub[Payload, SubscriberPayload](groupId: String, topicBuffer: ActorRef, transform: Message[Payload] => SubscriberPayload)(implicit materializer: Materializer)
-    extends InternalSubscriberStub[Payload, Message](groupId, topicBuffer) with Subscriber[SubscriberPayload] {
-
+  class SubscriberStub[Payload, SubscriberPayload](
+      groupId: String,
+      topicBuffer: ActorRef,
+      transform: Message[Payload] => SubscriberPayload
+  )(implicit materializer: Materializer)
+      extends InternalSubscriberStub[Payload, Message](groupId, topicBuffer)
+      with Subscriber[SubscriberPayload] {
     override def withMetadata: Subscriber[Message[SubscriberPayload]] =
-      new SubscriberStub[Payload, Message[SubscriberPayload]](groupId, topicBuffer,
-        msg => msg.withPayload(transform(msg)))
+      new SubscriberStub[Payload, Message[SubscriberPayload]](
+        groupId,
+        topicBuffer,
+        msg => msg.withPayload(transform(msg))
+      )
 
     override def withGroupId(groupId: String): Subscriber[SubscriberPayload] =
       new SubscriberStub[Payload, SubscriberPayload](groupId, topicBuffer, transform)
@@ -77,5 +91,4 @@ private[lagom] class TopicStub[T](val topicId: Topic.TopicId, topicBuffer: Actor
     override def atLeastOnce(flow: Flow[SubscriberPayload, Done, _]): Future[Done] =
       super.leastOnce(Flow[Message[Payload]].map(transform).via(flow))
   }
-
 }

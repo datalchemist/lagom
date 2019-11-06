@@ -1,19 +1,18 @@
-import com.lightbend.lagom.sbt.Internal.Keys.interactionMode
+val macwire = "com.softwaremill.macwire" %% "macros" % "2.3.3" % "provided"
 
-interactionMode in ThisBuild := com.lightbend.lagom.sbt.NonBlockingInteractionMode
-
-scalaVersion in ThisBuild := sys.props.get("scala.version").getOrElse("2.12.4")
-
-val macwire = "com.softwaremill.macwire" %% "macros" % "2.2.5" % "provided"
+// no need for Cassandra and Kafka on this test
+lagomCassandraEnabled in ThisBuild := false
+lagomKafkaEnabled in ThisBuild := false
 
 lazy val `a-api` = (project in file("a") / "api")
   .settings(
     libraryDependencies += lagomScaladslApi
   )
 
-lazy val `a-impl` = (project in file("a") / "impl").enablePlugins(LagomScala)
+lazy val `a-impl` = (project in file("a") / "impl")
+  .enablePlugins(LagomScala)
   .settings(
-    lagomServicePort := 10000,
+    lagomServiceHttpPort := 10000,
     libraryDependencies += macwire
   )
   .dependsOn(`a-api`)
@@ -23,9 +22,10 @@ lazy val `b-api` = (project in file("b") / "api")
     libraryDependencies += lagomScaladslApi
   )
 
-lazy val `b-impl` = (project in file("b") / "impl").enablePlugins(LagomScala)
+lazy val `b-impl` = (project in file("b") / "impl")
+  .enablePlugins(LagomScala)
   .settings(
-    lagomServicePort := 10001,
+    lagomServiceHttpPort := 10001,
     libraryDependencies += macwire
   )
   .dependsOn(`b-api`, `a-api`)
@@ -37,9 +37,10 @@ lazy val c = (project in file("c"))
     libraryDependencies += macwire
   )
 
-lazy val p = (project in file("p")).enablePlugins(PlayScala && LagomPlay)
+lazy val p = (project in file("p"))
+  .enablePlugins(PlayScala && LagomPlay)
   .settings(
-    lagomServicePort := 9001,
+    lagomServiceHttpPort := 9001,
     routesGenerator := InjectedRoutesGenerator,
     libraryDependencies ++= Seq(
       macwire
@@ -60,17 +61,7 @@ InputKey[Unit]("verifyNoReloadsProjC") := {
   try {
     val actual = IO.readLines((target in c).value / "reload.log").count(_.nonEmpty)
     throw new RuntimeException(s"Found a reload file, but there should be none!")
-  }
-  catch {
+  } catch {
     case e: Exception => () // if we are here it's all good
   }
-}
-
-InputKey[Unit]("assertRequest") := {
-  val args = Def.spaceDelimited().parsed
-  val port = args(0)
-  val path = args(1)
-  val expect = args.drop(2).mkString(" ")
-
-  DevModeBuild.waitForRequestToContain(s"http://localhost:${port}${path}", expect)
 }

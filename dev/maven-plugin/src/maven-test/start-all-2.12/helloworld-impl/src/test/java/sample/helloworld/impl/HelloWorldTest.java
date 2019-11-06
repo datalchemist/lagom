@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package sample.helloworld.impl;
 
 import static org.junit.Assert.assertEquals;
@@ -14,7 +18,7 @@ import com.lightbend.lagom.javadsl.testkit.PersistentEntityTestDriver.Outcome;
 
 import akka.Done;
 import akka.actor.ActorSystem;
-import akka.testkit.JavaTestKit;
+import akka.testkit.javadsl.TestKit;
 import sample.helloworld.impl.HelloCommand.Hello;
 import sample.helloworld.impl.HelloCommand.UseGreetingMessage;
 import sample.helloworld.impl.HelloEvent.GreetingMessageChanged;
@@ -30,7 +34,7 @@ public class HelloWorldTest {
 
   @AfterClass
   public static void teardown() {
-    JavaTestKit.shutdownActorSystem(system);
+    TestKit.shutdownActorSystem(system);
     system = null;
   }
 

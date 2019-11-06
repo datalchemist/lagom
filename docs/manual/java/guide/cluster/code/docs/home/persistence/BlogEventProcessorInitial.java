@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.home.persistence;
 
 import com.lightbend.lagom.javadsl.persistence.AggregateEventTag;
@@ -6,7 +10,7 @@ import org.pcollections.PSequence;
 
 public interface BlogEventProcessorInitial {
 
-  //#processor
+  // #processor
   public class BlogEventProcessor extends ReadSideProcessor<BlogEvent> {
 
     @Override
@@ -21,5 +25,5 @@ public interface BlogEventProcessorInitial {
       return null;
     }
   }
-  //#processor
+  // #processor
 }

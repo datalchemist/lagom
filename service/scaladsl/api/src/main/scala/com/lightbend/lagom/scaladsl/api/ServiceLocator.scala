@@ -1,13 +1,15 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.api
 
 import java.net.URI
 
 import com.lightbend.lagom.scaladsl.api.Descriptor.Call
 
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 
 /**
  * Locates services.
@@ -61,7 +63,7 @@ trait ServiceLocator {
   /**
    * Do the given action with the given service.
    *
-   * This should be used in preference to [[#locate]] when possible as it will allow the
+   * This should be used in preference to [[#locate(String, Descriptor.Call)]] when possible as it will allow the
    * service locator to add in things like circuit breakers.
    *
    * It is required that the service locator will, based on the service call circuit breaker configuration, wrap the
@@ -73,16 +75,19 @@ trait ServiceLocator {
    *              service. This will only be executed if the service was found.
    * @return The result of the executed block, if the service was found.
    */
-  def doWithService[T](name: String, serviceCall: Descriptor.Call[_, _])(block: URI => Future[T])(implicit ec: ExecutionContext): Future[Option[T]]
+  def doWithService[T](name: String, serviceCall: Descriptor.Call[_, _])(block: URI => Future[T])(
+      implicit ec: ExecutionContext
+  ): Future[Option[T]]
 }
 
 object ServiceLocator {
-
   /**
    * A service locator that doesn't resolve any services.
    */
   object NoServiceLocator extends ServiceLocator {
     override def locate(name: String, serviceCall: Call[_, _]): Future[Option[URI]] = Future.successful(None)
-    override def doWithService[T](name: String, serviceCall: Call[_, _])(block: (URI) => Future[T])(implicit ec: ExecutionContext): Future[Option[T]] = Future.successful(None)
+    override def doWithService[T](name: String, serviceCall: Call[_, _])(block: (URI) => Future[T])(
+        implicit ec: ExecutionContext
+    ): Future[Option[T]] = Future.successful(None)
   }
 }

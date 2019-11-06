@@ -1,8 +1,12 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.javadsl.persistence.cassandra
 
 import com.lightbend.lagom.javadsl.persistence.AbstractPersistentEntityActorSpec
+import com.typesafe.config.ConfigFactory
 
-class CassandraPersistentEntityActorSpec extends CassandraPersistenceSpec with AbstractPersistentEntityActorSpec
+class CassandraPersistentEntityActorSpec
+    extends CassandraPersistenceSpec(ConfigFactory.parseString("akka.loglevel = INFO"))
+    with AbstractPersistentEntityActorSpec

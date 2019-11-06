@@ -1,14 +1,15 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.client
 
 import java.util
 
-import com.typesafe.config.{ Config, ConfigException }
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigException
 
 object ConfigExtensions {
-
   /**
    * INTERNAL API
    *

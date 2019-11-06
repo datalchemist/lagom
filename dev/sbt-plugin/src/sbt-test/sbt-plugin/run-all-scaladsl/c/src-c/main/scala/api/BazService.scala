@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package api
 
 import akka.NotUsed
@@ -10,8 +14,10 @@ trait BazService extends Service {
 
   override def descriptor = {
     import Service._
-    named("c").withCalls(
-      restCall(Method.GET, "/baz", baz)
-    ).withAutoAcl(true)
+    named("c")
+      .withCalls(
+        restCall(Method.GET, "/baz", baz)
+      )
+      .withAutoAcl(true)
   }
 }

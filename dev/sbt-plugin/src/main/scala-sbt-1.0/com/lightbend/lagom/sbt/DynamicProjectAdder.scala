@@ -1,15 +1,16 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
-package sbt {
 
-  import sbt.internal.{ BuildStructure, Load, LoadedBuild }
+package sbt {
+  import sbt.internal.BuildStructure
+  import sbt.internal.Load
+  import sbt.internal.LoadedBuild
 
   object LagomLoad {
-
     def reapply(
-      newSettings: Seq[Setting[_]],
-      structure:   BuildStructure
+        newSettings: Seq[Setting[_]],
+        structure: BuildStructure
     )(implicit display: Show[ScopedKey[_]]): BuildStructure = Load.reapply(newSettings, structure)
 
     def finalTransforms(ss: Seq[Setting[_]]): Seq[Setting[_]] = Load.finalTransforms(ss)
@@ -18,17 +19,15 @@ package sbt {
 
     def projectScope(project: Reference): Scope = Load.projectScope(project)
     def transformSettings(
-      thisScope:   Scope,
-      uri:         URI,
-      rootProject: URI => String,
-      settings:    Seq[Setting[_]]
+        thisScope: Scope,
+        uri: URI,
+        rootProject: URI => String,
+        settings: Seq[Setting[_]]
     ): Seq[Setting[_]] = Load.transformSettings(thisScope, uri, rootProject, settings)
   }
-
 }
 
 package com.lightbend.lagom.sbt {
-
   import sbt._
   import sbt.Keys._
   import sbt.Setting
@@ -38,7 +37,6 @@ package com.lightbend.lagom.sbt {
   import sbt.internal.BuildStructure
 
   object DynamicProjectAdder {
-
     /**
      * Add a list of projects to the state.
      *
@@ -58,25 +56,33 @@ package com.lightbend.lagom.sbt {
         val base = extracted.get(Keys.baseDirectory in ThisBuild)
 
         val projectsAndSettings = undefinedProjects.map { project =>
-
           // Redefine the project root to be one in the target directory, this is a phantom project
-          val projectRoot = base / "target" / "lagom-dynamic-projects" / project.id
+          val projectRoot              = base / "target" / "lagom-dynamic-projects" / project.id
           val projectWithRoot: Project = project.in(projectRoot)
-          val projectRef = ProjectRef(structure.root, project.id)
+          val projectRef               = ProjectRef(structure.root, project.id)
 
           // Now we resolve the project. I don't know what that means, but it needs to be done because the type system
           // says so.
-          val resolvedProject = projectWithRoot.resolve(Scope.resolveProjectRef(structure.root, structure.rootProject, _))
+          val resolvedProject =
+            projectWithRoot.resolve(Scope.resolveProjectRef(structure.root, structure.rootProject, _))
 
           // Some really basic config that's apparently needed for any project to do anything.
-          val defineConfig: Seq[Setting[_]] = for (c <- resolvedProject.configurations) yield (configuration in (projectRef, ConfigKey(c.name))) := c
-          val builtin: Seq[Setting[_]] = (thisProject := resolvedProject) +: (thisProjectRef := projectRef) +: defineConfig
+          val defineConfig: Seq[Setting[_]] =
+            for (c <- resolvedProject.configurations)
+              yield (configuration in (projectRef, ConfigKey(c.name))) := c
+          val builtin
+              : Seq[Setting[_]] = (thisProject := resolvedProject) +: (thisProjectRef := projectRef) +: defineConfig
           // And put all the settings together
           val settings = builtin ++ projectWithRoot.settings
 
           // Now transform the settings. This transforms things like target := projectTarget to
           // target in projectRef := projectTarget
-          val transformedSettings = sbt.LagomLoad.transformSettings(sbt.LagomLoad.projectScope(projectRef), currentRef.build, rootProject, settings)
+          val transformedSettings = sbt.LagomLoad.transformSettings(
+            sbt.LagomLoad.projectScope(projectRef),
+            currentRef.build,
+            rootProject,
+            settings
+          )
 
           resolvedProject -> transformedSettings
         }
@@ -87,12 +93,13 @@ package com.lightbend.lagom.sbt {
         }
 
         // And we create the new build unit.
-        val unitWithNewProjects = new LoadedBuildUnit(currentUnit.unit, newDefinedProjects, currentUnit.rootProjects,
-          currentUnit.buildSettings)
+        val unitWithNewProjects =
+          new LoadedBuildUnit(currentUnit.unit, newDefinedProjects, currentUnit.rootProjects, currentUnit.buildSettings)
         // And now we create the new build, which has multiple build units, the units being a map of URIs to the build
         // base directories to the LoadedBuildUnit objects.  Most projects only have one build unit, but I think if you
         // use ProjectRefs to external builds you end up with multiple.
-        val buildWithNewProjects = new LoadedBuild(structure.root, structure.units + (currentUnit.unit.uri -> unitWithNewProjects))
+        val buildWithNewProjects =
+          new LoadedBuild(structure.root, structure.units + (currentUnit.unit.uri -> unitWithNewProjects))
         // Delegates are important, delegates are what are used to look up settings, if you execute or depend on
         // foo/compile:task, it uses delegates to look up task from the compile config from the foo scope, so we need to
         // recalculate these because we're adding new projects.
@@ -100,8 +107,14 @@ package com.lightbend.lagom.sbt {
         // And now create the new build structure, which has the new build unit and the new delegates. At this point, the
         // data, which is all the settings and tasks and anything, is not yet generated, that's ok.
         val structureWithNewProject = new BuildStructure(
-          buildWithNewProjects.units, structure.root, structure.settings, structure.data,
-          structure.index, structure.streams, delegatesWithNewProjects, structure.scopeLocal
+          buildWithNewProjects.units,
+          structure.root,
+          structure.settings,
+          structure.data,
+          structure.index,
+          structure.streams,
+          delegatesWithNewProjects,
+          structure.scopeLocal
         )
 
         // Compile all the new settings for each new project, and we also need to redefine the loadedBuild setting,
@@ -122,13 +135,12 @@ package com.lightbend.lagom.sbt {
         val reindexedStructure = sbt.LagomLoad.reapply(newSession.mergeSettings, structureWithNewProject)
 
         // And finally, put all the new stuff in a new state.
-        state.copy(attributes = state.attributes.put(stateBuildStructure, reindexedStructure).put(sessionSettings, newSession))
+        state.copy(
+          attributes = state.attributes.put(stateBuildStructure, reindexedStructure).put(sessionSettings, newSession)
+        )
       } else {
         state
       }
-
     }
-
   }
-
 }

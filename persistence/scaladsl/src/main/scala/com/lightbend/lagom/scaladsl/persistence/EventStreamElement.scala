@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.persistence
 
 import akka.persistence.query.Offset
@@ -14,11 +15,10 @@ object EventStreamElement {
  * Envelope for events in the eventstream, provides additional data to the actual event
  */
 final class EventStreamElement[+Event](
-  val entityId: String,
-  val event:    Event,
-  val offset:   Offset
+    val entityId: String,
+    val event: Event,
+    val offset: Offset
 ) {
-
   override def equals(other: Any): Boolean = other match {
     case that: EventStreamElement[_] =>
       entityId == that.entityId &&
@@ -33,5 +33,4 @@ final class EventStreamElement[+Event](
   }
 
   override def toString = s"EventStreamElement($entityId, $event, $offset)"
-
 }

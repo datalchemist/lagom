@@ -1,8 +1,12 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.home.scaladsl.immutable
 
 //#mutable
 class MutableUser {
-  private var name: String = null
+  private var name: String  = null
   private var email: String = null
 
   def getName: String = name

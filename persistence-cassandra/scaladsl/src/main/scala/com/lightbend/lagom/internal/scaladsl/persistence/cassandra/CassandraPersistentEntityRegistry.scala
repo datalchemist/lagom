@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.scaladsl.persistence.cassandra
 
 import akka.actor.ActorSystem
@@ -15,17 +16,11 @@ import com.lightbend.lagom.internal.scaladsl.persistence.AbstractPersistentEntit
  * Internal API
  */
 private[lagom] final class CassandraPersistentEntityRegistry(system: ActorSystem)
-  extends AbstractPersistentEntityRegistry(system) {
-
+    extends AbstractPersistentEntityRegistry(system) {
   private val log = Logging.getLogger(system, getClass)
 
   CassandraKeyspaceConfig.validateKeyspace("cassandra-journal", system.settings.config, log)
   CassandraKeyspaceConfig.validateKeyspace("cassandra-snapshot-store", system.settings.config, log)
 
-  override protected val journalId = CassandraReadJournal.Identifier
-
-  private val cassandraReadJournal = PersistenceQuery(system).readJournalFor[CassandraReadJournal](journalId)
-
-  override protected val eventsByTagQuery: Option[EventsByTagQuery] = Some(cassandraReadJournal)
-
+  protected override val queryPluginId = Some(CassandraReadJournal.Identifier)
 }

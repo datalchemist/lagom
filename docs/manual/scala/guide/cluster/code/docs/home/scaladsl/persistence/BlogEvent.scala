@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.home.scaladsl.persistence
 
 //#full-example
@@ -17,7 +21,8 @@ object BlogEvent {
   val serializers = Vector(
     JsonSerializer(Json.format[PostAdded]),
     JsonSerializer(Json.format[BodyChanged]),
-    JsonSerializer(Json.format[PostPublished]))
+    JsonSerializer(Json.format[PostPublished])
+  )
 }
 
 sealed trait BlogEvent extends AggregateEvent[BlogEvent] {

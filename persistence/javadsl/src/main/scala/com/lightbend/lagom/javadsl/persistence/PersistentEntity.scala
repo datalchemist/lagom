@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.javadsl.persistence
 
 import akka.japi.Util.immutableSeq
@@ -37,7 +38,9 @@ object PersistentEntity {
   /**
    * Exception that is used when command is not handled
    */
-  final case class UnhandledCommandException(message: String) extends IllegalArgumentException(message) with NoStackTrace
+  final case class UnhandledCommandException(message: String)
+      extends IllegalArgumentException(message)
+      with NoStackTrace
 
   /**
    * Exception that is used when persist fails.
@@ -82,6 +85,10 @@ object PersistentEntity {
  * successfully. Replies are sent with the `reply` method of the context that is passed
  * to the command handler function.
  *
+ * The command handlers may emit zero, one or many events. When many events are emitted,
+ * they are stored atomically and in the same order they were emitted. Only after persisting
+ * all the events external side effects will be performed.
+ *
  * The event handlers are typically only updating the state, but they may also change
  * the behavior of the entity in the sense that new functions for processing commands
  * and events may be defined. This is useful when implementing finite state machine (FSM)
@@ -115,7 +122,7 @@ abstract class PersistentEntity[Command, Event, State] {
 
   private var _entityId: String = _
 
-  final protected def entityId: String = _entityId
+  protected final def entityId: String = _entityId
 
   /**
    * INTERNAL API
@@ -168,7 +175,7 @@ abstract class PersistentEntity[Command, Event, State] {
   /**
    * Create a new empty `BehaviorBuilder` with a given state.
    */
-  final def newBehaviorBuilder(state: State): BehaviorBuilder = new BehaviorBuilder(state)
+  final def newBehaviorBuilder(state: State): BehaviorBuilder = new BehaviorBuilderImpl(state)
 
   /**
    * Behavior consists of current state and functions to process incoming commands
@@ -176,11 +183,10 @@ abstract class PersistentEntity[Command, Event, State] {
    * for defining command and event handlers.
    */
   case class Behavior(
-    state:           State,
-    eventHandlers:   Map[Class[_ <: Event], JFunction[_ <: Event, Behavior]],
-    commandHandlers: Map[Class[_ <: Command], JBiFunction[_ <: Command, CommandContext[Any], Persist[_ <: Event]]]
+      state: State,
+      eventHandlers: Map[Class[_ <: Event], JFunction[_ <: Event, Behavior]],
+      commandHandlers: Map[Class[_ <: Command], JBiFunction[_ <: Command, CommandContext[Any], Persist[_ <: Event]]]
   ) {
-
     /**
      * @return new instance with the given state
      */
@@ -191,57 +197,113 @@ abstract class PersistentEntity[Command, Event, State] {
      * Create a `BehaviorBuilder` that corresponds to this `Behavior`, i.e. the builder
      * is populated with same state, same event and command handler functions.
      */
-    def builder(): BehaviorBuilder = new BehaviorBuilder(state, eventHandlers, commandHandlers)
+    def builder(): BehaviorBuilder = new BehaviorBuilderImpl(state, eventHandlers, commandHandlers)
+  }
 
+  // in order to keep all the constructors protected but still generate javadocs this class
+  // extends a public sealed trait where documentation is provided.
+  private final class BehaviorBuilderImpl(
+      state: State,
+      evtHandlers: Map[Class[_ <: Event], JFunction[_ <: Event, Behavior]],
+      cmdHandlers: Map[Class[_ <: Command], JBiFunction[_ <: Command, CommandContext[Any], Persist[_ <: Event]]]
+  ) extends BehaviorBuilder {
+    def this(state: State) = this(state, Map.empty, Map.empty)
+
+    private var _state                                                                 = state
+    private var eventHandlers: Map[Class[_ <: Event], JFunction[_ <: Event, Behavior]] = evtHandlers
+    private var commandHandlers
+        : Map[Class[_ <: Command], JBiFunction[_ <: Command, CommandContext[Any], Persist[_ <: Event]]] =
+      cmdHandlers
+
+    @scala.deprecated("The method is deprecated because it was deemed obsolete", since = "1.5.0")
+    def getState(): State = _state
+
+    @scala.deprecated("The method is deprecated because it was deemed obsolete", since = "1.5.0")
+    def setState(state: State): Unit = {
+      _state = state
+    }
+
+    def setEventHandler[A <: Event](eventClass: Class[A], handler: JFunction[A, State]): Unit =
+      setEventHandlerChangingBehavior[A](eventClass, new JFunction[A, Behavior] {
+        override def apply(evt: A): Behavior = behavior.withState(handler.apply(evt))
+      })
+
+    def setEventHandlerChangingBehavior[A <: Event](eventClass: Class[A], handler: JFunction[A, Behavior]): Unit =
+      eventHandlers = eventHandlers.updated(eventClass, handler)
+
+    def removeEventHandler(eventClass: Class[_ <: Event]): Unit =
+      eventHandlers -= eventClass
+
+    def setCommandHandler[R, A <: Command with ReplyType[R]](
+        commandClass: Class[A],
+        handler: JBiFunction[A, CommandContext[R], Persist[_ <: Event]]
+    ): Unit = {
+      commandHandlers = commandHandlers.updated(
+        commandClass,
+        handler.asInstanceOf[JBiFunction[A, CommandContext[Any], Persist[_ <: Event]]]
+      )
+    }
+
+    def removeCommandHandler(commandClass: Class[_ <: Command]): Unit =
+      commandHandlers -= commandClass
+
+    def setReadOnlyCommandHandler[R, A <: Command with ReplyType[R]](
+        commandClass: Class[A],
+        handler: JBiConsumer[A, ReadOnlyCommandContext[R]]
+    ): Unit = {
+      setCommandHandler[R, A](
+        commandClass,
+        new JBiFunction[A, CommandContext[R], Persist[_ <: Event]] {
+          override def apply(cmd: A, ctx: CommandContext[R]): Persist[Event] = {
+            handler.accept(cmd, ctx)
+            ctx.done()
+          }
+        }
+      );
+    }
+
+    def build(): Behavior =
+      Behavior(_state, eventHandlers, commandHandlers)
   }
 
   /**
    * Mutable builder that is used for defining the event and command handlers.
-   * Use [#build] to create the immutable [[Behavior]].
+   * Use [[BehaviorBuilder#build]] to create the immutable [[PersistentEntity.Behavior]].
    */
-  protected final class BehaviorBuilder(
-    state:       State,
-    evtHandlers: Map[Class[_ <: Event], JFunction[_ <: Event, Behavior]],
-    cmdHandlers: Map[Class[_ <: Command], JBiFunction[_ <: Command, CommandContext[Any], Persist[_ <: Event]]]
-  ) {
-
-    def this(state: State) = this(state, Map.empty, Map.empty)
-
-    private var _state = state
-    private var eventHandlers: Map[Class[_ <: Event], JFunction[_ <: Event, Behavior]] = evtHandlers
-    private var commandHandlers: Map[Class[_ <: Command], JBiFunction[_ <: Command, CommandContext[Any], Persist[_ <: Event]]] =
-      cmdHandlers
-
-    def getState(): State = _state
-
-    def setState(state: State): Unit = {
-      _state = state
-    }
+  // In order to provide javadoc preventing instantiation or extension this sealed abstract class is added
+  // to hold docs and BehaviorBuilderImpl is made private to hold implementation.
+  // It is required to be an abstract class, not a trait, because it refers to type variables from the enclosing scope.
+  // This would be legal in Scala, but causes inter-operation problems with some Java compilers (such as Eclipse).
+  // See https://github.com/lagom/lagom/pull/1395
+  sealed abstract class BehaviorBuilder {
+    @scala.deprecated("The method is deprecated because it was deemed obsolete", since = "1.5.0")
+    def getState(): State
+    @scala.deprecated("The method is deprecated because it was deemed obsolete", since = "1.5.0")
+    def setState(state: State): Unit
 
     /**
      * Register an event handler for a given event class. The `handler` function
      * is supposed to return the new state after applying the event to the current state.
      * Current state can be accessed with the `state` method of the `PersistentEntity`.
+     *
+     * Invoking this method a second time for the same `eventClass` will override the existing `handler`.
      */
-    def setEventHandler[A <: Event](eventClass: Class[A], handler: JFunction[A, State]): Unit =
-      setEventHandlerChangingBehavior[A](eventClass, new JFunction[A, Behavior] {
-        override def apply(evt: A): Behavior = behavior.withState(handler.apply(evt))
-      })
+    def setEventHandler[A <: Event](eventClass: Class[A], handler: JFunction[A, State]): Unit
 
     /**
      * Register an event handler that is updating the behavior for a given event class.
      * The `handler` function  is supposed to return the new behavior after applying the
      * event to the current state. Current behavior can be accessed with the `behavior`
      * method of the `PersistentEntity`.
+     *
+     * Invoking this method a second time for the same `eventClass` will override the existing `handler`.
      */
-    def setEventHandlerChangingBehavior[A <: Event](eventClass: Class[A], handler: JFunction[A, Behavior]): Unit =
-      eventHandlers = eventHandlers.updated(eventClass, handler)
+    def setEventHandlerChangingBehavior[A <: Event](eventClass: Class[A], handler: JFunction[A, Behavior]): Unit
 
     /**
      * Remove an event handler for a given event class.
      */
-    def removeEventHandler(eventClass: Class[_ <: Event]): Unit =
-      eventHandlers -= eventClass
+    def removeEventHandler(eventClass: Class[_ <: Event]): Unit
 
     /**
      * Register a command handler for a given command class.
@@ -259,54 +321,42 @@ abstract class PersistentEntity[Command, Event, State] {
      *
      * The `handler` function may validate the incoming command and reject it by
      * sending a `reply` and returning `ctx.done()`.
+     *
+     * Invoking this method a second time for the same `commandClass` will override the existing `handler`.
      */
     def setCommandHandler[R, A <: Command with ReplyType[R]](
-      commandClass: Class[A],
-      handler:      JBiFunction[A, CommandContext[R], Persist[_ <: Event]]
-    ): Unit = {
-      commandHandlers = commandHandlers.updated(
-        commandClass,
-        handler.asInstanceOf[JBiFunction[A, CommandContext[Any], Persist[_ <: Event]]]
-      )
-    }
+        commandClass: Class[A],
+        handler: JBiFunction[A, CommandContext[R], Persist[_ <: Event]]
+    ): Unit
 
     /**
      * Remove a command handler for a given command class.
      */
-    def removeCommandHandler(commandClass: Class[_ <: Command]): Unit =
-      commandHandlers -= commandClass
+    def removeCommandHandler(commandClass: Class[_ <: Command]): Unit
 
     /**
      *  Register a read-only command handler for a given command class. A read-only command
      *  handler does not persist events (i.e. it does not change state) but it may perform side
      *  effects, such as replying to the request. Replies are sent with the `reply` method of the
      *  context that is passed to the command handler function.
+     *
+     * Invoking this method a second time for the same `commandClass` will override the existing `handler`.
      */
     def setReadOnlyCommandHandler[R, A <: Command with ReplyType[R]](
-      commandClass: Class[A],
-      handler:      JBiConsumer[A, ReadOnlyCommandContext[R]]
-    ): Unit = {
-      setCommandHandler[R, A](commandClass, new JBiFunction[A, CommandContext[R], Persist[_ <: Event]] {
-        override def apply(cmd: A, ctx: CommandContext[R]): Persist[Event] = {
-          handler.accept(cmd, ctx)
-          ctx.done()
-        }
-      });
-    }
+        commandClass: Class[A],
+        handler: JBiConsumer[A, ReadOnlyCommandContext[R]]
+    ): Unit
 
     /**
      * Construct the corresponding immutable `Behavior`.
      */
-    def build(): Behavior =
-      Behavior(_state, eventHandlers, commandHandlers)
-
+    def build(): Behavior
   }
 
   /**
    * The context that is passed to read-only command handlers.
    */
   abstract class ReadOnlyCommandContext[R] {
-
     /**
      * Send reply to a command. The type `R` must be the type defined by
      * the command.
@@ -330,7 +380,6 @@ abstract class PersistentEntity[Command, Event, State] {
    * The context that is passed to command handler function.
    */
   abstract class CommandContext[R] extends ReadOnlyCommandContext[R] {
-
     /**
      * A command handler may return this `Persist` directive to define
      * that one event is to be persisted.
@@ -348,7 +397,8 @@ abstract class PersistentEntity[Command, Event, State] {
 
     /**
      * A command handler may return this `Persist` directive to define
-     * that several events are to be persisted.
+     * that several events are to be persisted. Events will be persisted
+     * atomically and in the same order as they are passed here.
      */
     def thenPersistAll[B <: Event](events: JList[B]): Persist[B] =
       return new PersistAll(immutableSeq(events), afterPersist = null)
@@ -358,7 +408,8 @@ abstract class PersistentEntity[Command, Event, State] {
      * that several events are to be persisted. External side effects can be
      * performed after successful persist in the `afterPersist` function.
      * `afterPersist` is invoked once when all events have been persisted
-     * successfully.
+     * successfully. Events will be persisted atomically and in the same
+     * order as they are passed here.
      */
     def thenPersistAll[B <: Event](events: JList[B], afterPersist: Effect): Persist[B] =
       return new PersistAll(immutableSeq(events), afterPersist)
@@ -379,7 +430,6 @@ abstract class PersistentEntity[Command, Event, State] {
      * that no events are to be persisted.
      */
     def done[B <: Event](): Persist[B] = persistNone.asInstanceOf[Persist[B]]
-
   }
 
   /**
@@ -397,7 +447,8 @@ abstract class PersistentEntity[Command, Event, State] {
   /**
    * INTERNAL API
    */
-  private[lagom] case class PersistAll[B <: Event](val events: immutable.Seq[B], val afterPersist: Effect) extends Persist[B]
+  private[lagom] case class PersistAll[B <: Event](val events: immutable.Seq[B], val afterPersist: Effect)
+      extends Persist[B]
 
   /**
    * INTERNAL API
@@ -407,5 +458,4 @@ abstract class PersistentEntity[Command, Event, State] {
   }
 
   private val persistNone: PersistNone[Nothing] = PersistNone[Nothing]
-
 }

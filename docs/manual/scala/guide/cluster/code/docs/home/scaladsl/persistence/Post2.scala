@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.home.scaladsl.persistence
 
 import akka.Done
@@ -9,10 +13,9 @@ import com.lightbend.lagom.scaladsl.persistence.PersistentEntity
 import com.lightbend.lagom.scaladsl.persistence.PersistentEntity.ReplyType
 
 final class Post2 extends PersistentEntity {
-
   override type Command = BlogCommand
-  override type Event = BlogEvent
-  override type State = BlogState
+  override type Event   = BlogEvent
+  override type State   = BlogState
 
   override def initialState: BlogState = BlogState.empty
 
@@ -46,7 +49,8 @@ final class Post2 extends PersistentEntity {
           if (content.title == null || content.title.equals("")) {
             ctx.invalidCommand("Title must be defined")
             ctx.done
-          } //#validate-command
+          }
+          //#validate-command
           else {
             ctx.thenPersist(PostAdded(entityId, content)) { _ =>
               // After persist is done additional side effects can be performed
@@ -69,7 +73,7 @@ final class Post2 extends PersistentEntity {
   private val postAdded: Actions = {
     //#postAdded-actions
     Actions()
-      //#reply
+    //#reply
       .onCommand[ChangeBody, Done] {
         case (ChangeBody(body), ctx, state) =>
           ctx.thenPersist(BodyChanged(entityId, body))(_ => ctx.reply(Done))
@@ -86,5 +90,4 @@ final class Post2 extends PersistentEntity {
       }
     //#read-only-command-handler
   }
-
 }

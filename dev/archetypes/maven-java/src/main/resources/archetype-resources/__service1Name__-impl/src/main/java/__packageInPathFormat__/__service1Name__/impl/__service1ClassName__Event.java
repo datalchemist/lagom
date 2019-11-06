@@ -8,12 +8,11 @@ import lombok.Value;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.lightbend.lagom.serialization.Jsonable;
 
 /**
- * This interface defines all the events that the ${service1ClassName} entity supports.
+ * This interface defines all the events that the ${service1ClassName} aggregate supports.
  * <p>
  * By convention, the events should be inner classes of the interface, which
  * makes it simple to get a complete picture of what events an entity has.
@@ -45,7 +44,6 @@ public interface ${service1ClassName}Event extends Jsonable, AggregateEvent<${se
       this.message = Preconditions.checkNotNull(message, "message");
     }
   }
-
 
   @Override
   default AggregateEventTagger<${service1ClassName}Event> aggregateTag() {

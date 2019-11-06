@@ -1,16 +1,19 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.javadsl.pubsub;
 
-import java.io.Serializable;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.lightbend.lagom.serialization.Jsonable;
 
-public class Notification implements Serializable {
+public class Notification implements Jsonable {
 
   private static final long serialVersionUID = 1L;
 
   private final String msg;
 
+  @JsonCreator
   public Notification(String msg) {
     this.msg = msg;
   }
@@ -29,18 +32,13 @@ public class Notification implements Serializable {
 
   @Override
   public boolean equals(Object obj) {
-    if (this == obj)
-      return true;
-    if (obj == null)
-      return false;
-    if (getClass() != obj.getClass())
-      return false;
+    if (this == obj) return true;
+    if (obj == null) return false;
+    if (getClass() != obj.getClass()) return false;
     Notification other = (Notification) obj;
     if (msg == null) {
-      if (other.msg != null)
-        return false;
-    } else if (!msg.equals(other.msg))
-      return false;
+      if (other.msg != null) return false;
+    } else if (!msg.equals(other.msg)) return false;
     return true;
   }
 
@@ -48,5 +46,4 @@ public class Notification implements Serializable {
   public String toString() {
     return "Notification [msg=" + msg + "]";
   }
-
 }

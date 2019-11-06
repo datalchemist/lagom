@@ -1,6 +1,10 @@
+/*
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
+ */
+
 package docs.home.serialization;
 
-//#jsonable
+// #jsonable
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.lightbend.lagom.javadsl.immutable.ImmutableStyle;
 import com.lightbend.lagom.serialization.Jsonable;
@@ -15,4 +19,4 @@ public interface AbstractUser extends Jsonable {
 
   String getEmail();
 }
-//#jsonable
+// #jsonable

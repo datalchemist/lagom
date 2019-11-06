@@ -1,14 +1,14 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.javadsl.persistence.protobuf
 
 import java.io.NotSerializableException
 
-import scala.concurrent.duration._
 import akka.actor.ExtendedActorSystem
 import akka.serialization.SerializationExtension
-import com.lightbend.lagom.internal.persistence.cluster.ClusterDistribution.EnsureActive
+import com.lightbend.lagom.internal.cluster.ClusterDistribution.EnsureActive
 import com.lightbend.lagom.persistence.ActorSystemSpec
 import com.lightbend.lagom.javadsl.persistence.CommandEnvelope
 import com.lightbend.lagom.javadsl.persistence.PersistentEntity.InvalidCommandException
@@ -17,8 +17,9 @@ import com.lightbend.lagom.javadsl.persistence.PersistentEntity.UnhandledCommand
 import com.lightbend.lagom.javadsl.persistence.PersistentEntityRef
 import com.lightbend.lagom.javadsl.persistence.TestEntity
 
-class PersistenceMessageSerializerSpec extends ActorSystemSpec {
+import java.time.{ Duration => JDuration }
 
+class PersistenceMessageSerializerSpec extends ActorSystemSpec {
   val serializer = new PersistenceMessageSerializer(system.asInstanceOf[ExtendedActorSystem])
 
   def checkSerialization(obj: AnyRef): Unit = {
@@ -32,7 +33,6 @@ class PersistenceMessageSerializerSpec extends ActorSystemSpec {
   }
 
   "PersistenceMessageSerializer" must {
-
     "serialize CommandEnvelope" in {
       checkSerialization(CommandEnvelope("entityId", TestEntity.Add.of("a")))
     }
@@ -55,9 +55,10 @@ class PersistenceMessageSerializerSpec extends ActorSystemSpec {
 
     "not serialize PersistentEntityRef" in {
       intercept[NotSerializableException] {
-        SerializationExtension(system).serialize(new PersistentEntityRef[String]("abc", system.deadLetters, system, 5.seconds)).get
+        SerializationExtension(system)
+          .serialize(new PersistentEntityRef[String]("abc", system.deadLetters, JDuration.ofSeconds(5)))
+          .get
       }
     }
   }
-
 }

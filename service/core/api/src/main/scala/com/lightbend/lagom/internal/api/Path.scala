@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.api
 
 import java.util.regex.Pattern
@@ -32,9 +33,10 @@ case class Path(pathSpec: String, parts: Seq[PathPart], queryParams: Seq[String]
   }
 
   def format(allParams: Seq[Seq[String]]): (String, Map[String, Seq[String]]) = {
-
     if (dynamicParts.size + queryParams.size != allParams.size) {
-      throw new IllegalArgumentException(s"Param number mismatch, attempt to encode ${allParams.size} params into path spec $pathSpec")
+      throw new IllegalArgumentException(
+        s"Param number mismatch, attempt to encode ${allParams.size} params into path spec $pathSpec"
+      )
     }
 
     val (resultPathParts, leftOverParams) = parts.foldLeft((Seq.empty[String], allParams)) {
@@ -47,7 +49,10 @@ case class Path(pathSpec: String, parts: Seq[PathPart], queryParams: Seq[String]
             } else {
               value
             }
-          case other => throw new IllegalArgumentException("Illegal attempt to encode zero or multiple parts into a path segment: " + other)
+          case other =>
+            throw new IllegalArgumentException(
+              "Illegal attempt to encode zero or multiple parts into a path segment: " + other
+            )
         }
         (pathParts :+ encodedValue, params.tail)
     }
@@ -56,7 +61,6 @@ case class Path(pathSpec: String, parts: Seq[PathPart], queryParams: Seq[String]
     val queryValues = queryParams.zip(leftOverParams).toMap
     path -> queryValues
   }
-
 }
 
 sealed trait PathPart {
@@ -103,17 +107,18 @@ object Path {
 
     def queryParams: Parser[Seq[String]] = "?" ~> repsep(queryParam, "&")
 
-    def pathSpec: Parser[Seq[PathPart]] = "/" ~> (staticPathPart | singleComponentPathPart | multipleComponentsPathPart | regexComponentPathPart).* ^^ {
-      case parts => parts match {
-        case StaticPathPart(path) :: tail => StaticPathPart(s"/$path") :: tail
-        case _                            => StaticPathPart("/") :: parts
+    def pathSpec: Parser[Seq[PathPart]] =
+      "/" ~> (staticPathPart | singleComponentPathPart | multipleComponentsPathPart | regexComponentPathPart).* ^^ {
+        case parts =>
+          parts match {
+            case StaticPathPart(path) :: tail => StaticPathPart(s"/$path") :: tail
+            case _                            => StaticPathPart("/") :: parts
+          }
       }
-    }
 
     def parser(spec: String): Parser[Path] = pathSpec ~ queryParams.? ^^ {
       case parts ~ queryParams => Path(spec, parts, queryParams.getOrElse(Nil))
     }
-
   }
 
   def parse(spec: String): Path = {

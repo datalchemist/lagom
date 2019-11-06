@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.scaladsl.persistence.jdbc
 
 import com.lightbend.lagom.internal.persistence.ReadSideConfig
@@ -14,12 +15,11 @@ import scala.concurrent.duration.FiniteDuration
  * INTERNAL API
  */
 class OffsetTableConfiguration(config: Config, readSideConfig: ReadSideConfig)
-  extends AbstractSlickOffsetStoreConfiguration(config) {
-
-  override def minBackoff: FiniteDuration = readSideConfig.minBackoff
-  override def maxBackoff: FiniteDuration = readSideConfig.maxBackoff
-  override def randomBackoffFactor: Double = readSideConfig.randomBackoffFactor
+    extends AbstractSlickOffsetStoreConfiguration(config) {
+  override def minBackoff: FiniteDuration           = readSideConfig.minBackoff
+  override def maxBackoff: FiniteDuration           = readSideConfig.maxBackoff
+  override def randomBackoffFactor: Double          = readSideConfig.randomBackoffFactor
   override def globalPrepareTimeout: FiniteDuration = readSideConfig.globalPrepareTimeout
-  override def role: Option[String] = readSideConfig.role
-  override def toString: String = s"OffsetTableConfiguration($tableName,$schemaName)"
+  override def role: Option[String]                 = readSideConfig.role
+  override def toString: String                     = s"OffsetTableConfiguration($tableName,$schemaName)"
 }

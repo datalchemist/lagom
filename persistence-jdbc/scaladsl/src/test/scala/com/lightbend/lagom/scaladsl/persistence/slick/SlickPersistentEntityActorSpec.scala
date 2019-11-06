@@ -1,12 +1,14 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.persistence.slick
 
-import com.lightbend.lagom.scaladsl.persistence.{ AbstractPersistentEntityActorSpec, TestEntitySerializerRegistry }
+import com.lightbend.lagom.scaladsl.persistence.AbstractPersistentEntityActorSpec
+import com.lightbend.lagom.scaladsl.persistence.TestEntitySerializerRegistry
 
 import scala.concurrent.ExecutionContext
 
-class SlickPersistentEntityActorSpec(implicit ec: ExecutionContext)
-  extends SlickPersistenceSpec(TestEntitySerializerRegistry)
-  with AbstractPersistentEntityActorSpec
+class SlickPersistentEntityActorSpec
+    extends SlickPersistenceSpec(TestEntitySerializerRegistry)
+    with AbstractPersistentEntityActorSpec

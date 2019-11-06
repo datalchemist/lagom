@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.client
 
 import akka.actor.ActorSystem
@@ -8,30 +9,26 @@ import akka.pattern.CircuitBreakerOpenException
 import com.lightbend.lagom.internal.spi.CircuitBreakerMetricsProvider
 import com.typesafe.config.ConfigFactory
 import org.scalatest.concurrent.Futures
-import org.scalatest.{ AsyncFlatSpec, BeforeAndAfterAll, Matchers }
+import org.scalatest.AsyncFlatSpec
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.Matchers
 
+import scala.concurrent.Await
 import scala.concurrent.Future
+import scala.concurrent.duration._
 
-/**
- *
- */
-class CircuitBreakersPanelInternalSpec
-  extends AsyncFlatSpec
-  with Matchers
-  with BeforeAndAfterAll
-  with Futures {
-
+class CircuitBreakersPanelInternalSpec extends AsyncFlatSpec with Matchers with BeforeAndAfterAll with Futures {
   val actorSystem = ActorSystem("CircuitBreakersPanelInternalSpec")
 
   override def afterAll() = {
-    actorSystem.terminate()
+    Await.ready(actorSystem.terminate(), 10.seconds)
   }
 
-  behavior of "CircuitBreakersPanelInternal"
+  behavior.of("CircuitBreakersPanelInternal")
 
   it should "keep the circuit closed on whitelisted exceptions" in {
     val fakeExceptionName = new FakeException("").getClass.getName
-    val whitelist = Array(fakeExceptionName)
+    val whitelist         = Array(fakeExceptionName)
 
     // This CircuitBreakersPanelInternal has 'FakeException' whitelisted so when it's thrown on
     // the 2nd step it won't open the circuit.
@@ -78,13 +75,16 @@ class CircuitBreakersPanelInternalSpec
     panel
       .withCircuitBreaker("cb")(Future.failed(failure))
       .recover {
-        case _ => Future.successful("We expect a Failure but we must capture the exception thrown to move forward with the test.")
+        case _ =>
+          Future.successful(
+            "We expect a Failure but we must capture the exception thrown to move forward with the test."
+          )
       }
   }
 
   private def panelWith(whitelist: Array[String]) = {
-    val config = configWithWhiteList(whitelist: _*)
-    val cbConfig: CircuitBreakerConfig = new CircuitBreakerConfig(config)
+    val config                                         = configWithWhiteList(whitelist: _*)
+    val cbConfig: CircuitBreakerConfig                 = new CircuitBreakerConfig(config)
     val metricsProvider: CircuitBreakerMetricsProvider = new CircuitBreakerMetricsProviderImpl(actorSystem)
     new CircuitBreakersPanelInternal(actorSystem, cbConfig, metricsProvider)
   }
@@ -110,7 +110,6 @@ class CircuitBreakersPanelInternalSpec
        |#//#circuit-breaker-default
     """.stripMargin
   )
-
 }
 
 class FakeException(msg: String) extends RuntimeException(msg)

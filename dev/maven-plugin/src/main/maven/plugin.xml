@@ -34,13 +34,53 @@
             <description>The range of ports this service should run on</description>
         </parameter>
         <parameter>
+            <name>serviceAddress</name>
+            <type>java.lang.String</type>
+            <required>false</required>
+            <editable>true</editable>
+            <description>The address this service should run on</description>
+            <configuration>
+                <serviceAddress implementation="java.lang.String" default-value="127.0.0.1"/>
+            </configuration>
+        </parameter>
+        <parameter>
+            <name>serviceEnableSsl</name>
+            <type>boolean</type>
+            <required>false</required>
+            <editable>true</editable>
+            <description>Whether SSL is enabled or not.</description>
+            <configuration>
+                <serviceEnableSsl implementation="boolean" default-value="false"/>
+            </configuration>
+        </parameter>
+        <parameter>
             <name>servicePort</name>
             <type>int</type>
             <required>false</required>
             <editable>true</editable>
-            <description>The port this service should run on</description>
+            <description>The port this service should run on. Deprecated, use serviceHttpPort instead.</description>
             <configuration>
                 <servicePort implementation="int" default-value="-1"/>
+            </configuration>
+        </parameter>
+        <parameter>
+            <name>serviceHttpPort</name>
+            <type>int</type>
+            <required>false</required>
+            <editable>true</editable>
+            <description>The http port this service should run on</description>
+            <configuration>
+                <serviceHttpPort implementation="int" default-value="-1"/>
+            </configuration>
+        </parameter>
+        <parameter>
+            <name>serviceHttpsPort</name>
+            <type>int</type>
+            <required>false</required>
+            <editable>true</editable>
+            <description>The https port this service should run on</description>
+            <configuration>
+                <serviceHttpsPort implementation="int" default-value="-1"/>
             </configuration>
         </parameter>
         <parameter>
@@ -88,7 +128,7 @@
             <editable>true</editable>
             <description>Whether the Cassandra database should be cleaned when it starts.</description>
             <configuration>
-                <cassandraCleanOnStart implementation="boolean" default-value="true">${cassandra.cleanOnStart}</cassandraCleanOnStart>
+                <cassandraCleanOnStart implementation="boolean" default-value="false">${cassandra.cleanOnStart}</cassandraCleanOnStart>
             </configuration>
         </parameter>
         <parameter>
@@ -162,7 +202,7 @@
         </parameter>
          <parameter>
             <name>kafkaAddress</name>
-            <type>boolean</type>
+            <type>java.lang.String</type>
             <required>false</required>
             <editable>true</editable>
             <description>The Kafka address.</description>
@@ -170,7 +210,16 @@
                 <kafkaAddress implementation="java.lang.String">${kafka.address}</kafkaAddress>
             </configuration>
         </parameter>
-
+        <parameter>
+            <name>serviceLocatorAddress</name>
+            <type>java.lang.String</type>
+            <required>false</required>
+            <editable>true</editable>
+            <description>The host to run the service locator on.</description>
+            <configuration>
+                <serviceLocatorAddress implementation="java.lang.String" default-value="127.0.0.1">${service.locator.address}</serviceLocatorAddress>
+            </configuration>
+        </parameter>
         <parameter>
             <name>serviceLocatorPort</name>
             <type>int</type>
@@ -179,6 +228,16 @@
             <description>The port to run the service locator on.</description>
             <configuration>
                 <serviceLocatorPort implementation="int" default-value="9008">${service.locator.port}</serviceLocatorPort>
+            </configuration>
+        </parameter>
+        <parameter>
+            <name>serviceGatewayAddress</name>
+            <type>java.lang.String</type>
+            <required>false</required>
+            <editable>true</editable>
+            <description>The host to run the service gateway on.</description>
+            <configuration>
+                <serviceGatewayAddress implementation="java.lang.String" default-value="127.0.0.1">${service.gateway.address}</serviceGatewayAddress>
             </configuration>
         </parameter>
         <parameter>
@@ -220,7 +279,7 @@
         </parameter>
         <parameter>
             <name>serviceLocatorUrl</name>
-            <type>boolean</type>
+            <type>java.lang.String</type>
             <required>false</required>
             <editable>true</editable>
             <description>The service locator URL.</description>
@@ -236,17 +295,6 @@
             <description>A list of external projects to run in dev mode.</description>
         </parameter>
 
-        <parameter>
-            <name>sourceConductRBundle</name>
-            <type>java.util.File</type>
-            <required>false</required>
-            <editable>true</editable>
-            <description>The source ConductR bundle to rename.</description>
-            <configuration>
-                <sourceConductRBundle implementation="java.util.File"
-                                      default-value="${project.build.directory}/${project.build.finalName}-conductr-bundle.zip"/>
-            </configuration>
-        </parameter>
         <parameter>
             <name>outputDirectory</name>
             <type>java.util.File</type>
@@ -405,7 +453,13 @@
             <phase>pre-integration-test</phase>
             <parameters>
                 <parameter>
+                    <name>serviceLocatorAddress</name>
+                </parameter>
+                <parameter>
                     <name>serviceLocatorPort</name>
+                </parameter>
+                <parameter>
+                    <name>serviceGatewayAddress</name>
                 </parameter>
                 <parameter>
                     <name>serviceGatewayPort</name>
@@ -465,7 +519,20 @@
                     <name>playService</name>
                 </parameter>
                 <parameter>
+                    <name>serviceAddress</name>
+                </parameter>
+                <parameter>
+                    <name>serviceEnableSsl</name>
+                </parameter>
+                <parameter>
                     <name>servicePort</name>
+                    <deprecated>As of release 1.5.0. Use serviceHttpPort instead.</deprecated>
+                </parameter>
+                <parameter>
+                    <name>serviceHttpPort</name>
+                </parameter>
+                <parameter>
+                    <name>serviceHttpsPort</name>
                 </parameter>
                 <parameter>
                     <name>servicePortRange</name>
@@ -534,6 +601,9 @@
                     <name>servicePortRange</name>
                 </parameter>
                 <parameter>
+                    <name>serviceAddress</name>
+                </parameter>
+                <parameter>
                     <name>serviceLocatorPort</name>
                 </parameter>
                 <parameter>
@@ -561,25 +631,6 @@
             <parameters>
                 <parameter>
                     <name>externalProjects</name>
-                </parameter>
-            </parameters>
-        </mojo>
-
-        <mojo>
-            <goal>renameConductRBundle</goal>
-            <description>Renames a ConductR bundle to match ConductR requirements.</description>
-            <implementation>com.lightbend.lagom.maven.RenameConductRBundleMojo</implementation>
-            <instantiationStrategy>per-lookup</instantiationStrategy>
-            <phase>package</phase>
-            <parameters>
-                <parameter>
-                    <name>sourceConductRBundle</name>
-                </parameter>
-                <parameter>
-                    <name>bundleName</name>
-                </parameter>
-                <parameter>
-                    <name>outputDirectory</name>
                 </parameter>
             </parameters>
         </mojo>

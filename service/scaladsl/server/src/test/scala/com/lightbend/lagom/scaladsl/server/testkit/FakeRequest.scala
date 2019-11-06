@@ -1,14 +1,17 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.server.testkit
 
 import java.net.URI
 
 import akka.NotUsed
 import play.api.libs.typedmap.TypedMap
-import play.api.mvc.request.{ RemoteConnection, RequestTarget }
-import play.api.mvc.{ Headers, Request }
+import play.api.mvc.request.RemoteConnection
+import play.api.mvc.request.RequestTarget
+import play.api.mvc.Headers
+import play.api.mvc.Request
 import play.core.parsers.FormUrlEncodedParser
 
 /**
@@ -18,7 +21,8 @@ import play.core.parsers.FormUrlEncodedParser
 class FakeRequest(override val method: String, path: String) extends Request[NotUsed] {
   override def body: NotUsed = NotUsed
 
-  override def connection: RemoteConnection = RemoteConnection(remoteAddressString = "127.0.0.1", secure = false, clientCertificateChain = None)
+  override def connection: RemoteConnection =
+    RemoteConnection(remoteAddressString = "127.0.0.1", secure = false, clientCertificateChain = None)
 
   private val _path = path
 
@@ -27,7 +31,7 @@ class FakeRequest(override val method: String, path: String) extends Request[Not
 
     override def uriString: String = _path
 
-    override lazy val path: String = uriString.split('?').take(1).mkString
+    override lazy val path: String                       = uriString.split('?').take(1).mkString
     override lazy val queryMap: Map[String, Seq[String]] = FormUrlEncodedParser.parse(queryString)
   }
 

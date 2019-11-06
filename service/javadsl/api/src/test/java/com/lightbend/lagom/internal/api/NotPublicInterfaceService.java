@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.internal.api;
 
 import com.lightbend.lagom.javadsl.api.Descriptor;
@@ -15,9 +16,6 @@ interface NotPublicInterfaceService extends Service {
   ServiceCall<String, String> helloA();
 
   default Descriptor descriptor() {
-    return named("/serviceA").withCalls(
-        call(this::helloA)
-    );
+    return named("/serviceA").withCalls(call(this::helloA));
   }
-
 }

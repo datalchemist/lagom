@@ -1,21 +1,31 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.persistence.jdbc
 
 import akka.actor.ActorSystem
-import akka.stream.{ ActorMaterializer, Materializer }
+import akka.actor.CoordinatedShutdown
+import akka.stream.ActorMaterializer
+import akka.stream.Materializer
 import com.lightbend.lagom.scaladsl.persistence.TestEntity.Evt
-import com.lightbend.lagom.scaladsl.persistence.multinode.{ AbstractClusteredPersistentEntityConfig, AbstractClusteredPersistentEntitySpec }
-import com.lightbend.lagom.scaladsl.persistence.{ ReadSideProcessor, TestEntitySerializerRegistry }
+import com.lightbend.lagom.scaladsl.persistence.multinode.AbstractClusteredPersistentEntityConfig
+import com.lightbend.lagom.scaladsl.persistence.multinode.AbstractClusteredPersistentEntitySpec
+import com.lightbend.lagom.scaladsl.persistence.ReadSideProcessor
+import com.lightbend.lagom.scaladsl.persistence.TestEntitySerializerRegistry
 import com.lightbend.lagom.scaladsl.playjson.JsonSerializerRegistry
-import com.typesafe.config.{ Config, ConfigFactory }
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
 import org.h2.tools.Server
-import play.api.{ Configuration, Environment }
+import play.api.Configuration
+import play.api.Environment
 import play.api.db.HikariCPComponents
-import play.api.inject.{ ApplicationLifecycle, DefaultApplicationLifecycle }
+import play.api.inject.ApplicationLifecycle
+import play.api.inject.DefaultApplicationLifecycle
 
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.Await
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 
 object JdbcClusteredPersistentEntityConfig extends AbstractClusteredPersistentEntityConfig {
   override def additionalCommonConfig(databasePort: Int): Config = ConfigFactory.parseString(
@@ -30,26 +40,24 @@ class JdbcClusteredPersistentEntitySpecMultiJvmNode1 extends JdbcClusteredPersis
 class JdbcClusteredPersistentEntitySpecMultiJvmNode2 extends JdbcClusteredPersistentEntitySpec
 class JdbcClusteredPersistentEntitySpecMultiJvmNode3 extends JdbcClusteredPersistentEntitySpec
 
-class JdbcClusteredPersistentEntitySpec extends AbstractClusteredPersistentEntitySpec(JdbcClusteredPersistentEntityConfig) {
-
+class JdbcClusteredPersistentEntitySpec
+    extends AbstractClusteredPersistentEntitySpec(JdbcClusteredPersistentEntityConfig) {
   import JdbcClusteredPersistentEntityConfig._
 
   var h2: Server = _
 
-  override protected def atStartup(): Unit = {
+  protected override def atStartup(): Unit = {
     runOn(node1) {
       h2 = Server.createTcpServer("-tcpPort", databasePort.toString).start()
     }
 
     enterBarrier("h2-started")
-
     super.atStartup()
   }
 
-  override protected def afterTermination(): Unit = {
+  protected override def afterTermination(): Unit = {
     super.afterTermination()
-    defaultApplicationLifecycle.stop()
-
+    Await.ready(defaultApplicationLifecycle.stop(), shutdownTimeout)
     Option(h2).foreach(_.stop())
   }
 
@@ -57,23 +65,24 @@ class JdbcClusteredPersistentEntitySpec extends AbstractClusteredPersistentEntit
 
   override lazy val components: JdbcPersistenceComponents =
     new JdbcPersistenceComponents with HikariCPComponents {
-      override def actorSystem: ActorSystem = JdbcClusteredPersistentEntitySpec.this.system
-      override def executionContext: ExecutionContext = system.dispatcher
-      override lazy val materializer: Materializer = ActorMaterializer.create(system)
-      override lazy val configuration: Configuration = Configuration(system.settings.config)
-      override def environment: Environment = JdbcClusteredPersistentEntityConfig.environment
+      override def actorSystem: ActorSystem                 = JdbcClusteredPersistentEntitySpec.this.system
+      override def executionContext: ExecutionContext       = system.dispatcher
+      override def coordinatedShutdown: CoordinatedShutdown = CoordinatedShutdown(actorSystem)
+
+      override lazy val materializer: Materializer                 = ActorMaterializer.create(system)
+      override lazy val configuration: Configuration               = Configuration(system.settings.config)
+      override def environment: Environment                        = JdbcClusteredPersistentEntityConfig.environment
       override lazy val applicationLifecycle: ApplicationLifecycle = defaultApplicationLifecycle
-      override def jsonSerializerRegistry: JsonSerializerRegistry = TestEntitySerializerRegistry
+      override def jsonSerializerRegistry: JsonSerializerRegistry  = TestEntitySerializerRegistry
     }
 
   lazy val jdbcTestEntityReadSide: JdbcTestEntityReadSide =
     new JdbcTestEntityReadSide(components.jdbcSession)
 
-  override protected def getAppendCount(id: String): Future[Long] =
+  protected override def getAppendCount(id: String): Future[Long] =
     jdbcTestEntityReadSide.getAppendCount(id)
 
-  override protected def readSideProcessor: () => ReadSideProcessor[Evt] = {
-    () => new JdbcTestEntityReadSide.TestEntityReadSideProcessor(components.jdbcReadSide)
+  protected override def readSideProcessor: () => ReadSideProcessor[Evt] = { () =>
+    new JdbcTestEntityReadSide.TestEntityReadSideProcessor(components.jdbcReadSide)
   }
 }
-

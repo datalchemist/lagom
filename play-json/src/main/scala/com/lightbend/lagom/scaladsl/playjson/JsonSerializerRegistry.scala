@@ -1,11 +1,13 @@
 /*
- * Copyright (C) 2016-2018 Lightbend Inc. <https://www.lightbend.com>
+ * Copyright (C) 2016-2019 Lightbend Inc. <https://www.lightbend.com>
  */
+
 package com.lightbend.lagom.scaladsl.playjson
 
 import akka.actor.ExtendedActorSystem
 import akka.actor.setup.ActorSystemSetup
-import akka.serialization.{ SerializationSetup, SerializerDetails }
+import akka.serialization.SerializationSetup
+import akka.serialization.SerializerDetails
 
 import scala.collection.immutable
 
@@ -14,7 +16,6 @@ import scala.collection.immutable
  * or manually by creating a serialization setup and passing it to the ActorSystem constructor.
  */
 abstract class JsonSerializerRegistry {
-
   def serializers: immutable.Seq[JsonSerializer[_]]
 
   /**
@@ -29,7 +30,7 @@ abstract class JsonSerializerRegistry {
     val self = this
     new JsonSerializerRegistry {
       override def serializers = self.serializers ++ other.serializers
-      override def migrations = self.migrations ++ other.migrations
+      override def migrations  = self.migrations ++ other.migrations
     }
   }
 }
@@ -106,7 +107,6 @@ trait RequiresJsonSerializerRegistry extends ProvidesJsonSerializerRegistry {
  * mandatory serializer as the optional serializer provided by this trait.
  */
 trait ProvidesJsonSerializerRegistry {
-
   /**
    * The optionally provided serializer registry.
    *
